@@ -21,8 +21,8 @@ func main() {
 	cfg := config.Load()
 
 	// Ensure storage directories exist
-	for _, dir := range []string{cfg.UploadDir, cfg.PaymentUploadDir} {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+	for _, dir := range []string{cfg.UploadDir, cfg.PaymentUploadDir, cfg.EventsUploadDir} {
+		if err := os.MkdirAll(dir, 0777); err != nil {
 			log.Printf("Warning: could not create directory %s: %v", dir, err)
 		}
 	}
@@ -68,6 +68,12 @@ func main() {
 		Compress: false,
 	})
 
+	// Serve uploaded event banners at /events/*
+	app.Static("/events", cfg.EventsUploadDir, fiber.Static{
+		MaxAge:   86400,
+		Compress: false,
+	})
+
 	// Initialize session store
 	store := session.New(session.Config{
 		Expiration:     8 * time.Hour,
@@ -77,7 +83,7 @@ func main() {
 	})
 
 	// Register all page and API routes
-	routes.Register(app, db, cfg.PaymentUploadDir, cfg.AdminUsername, cfg.AdminPassword, store)
+	routes.Register(app, db, cfg.PaymentUploadDir, cfg.EventsUploadDir, cfg.AdminUsername, cfg.AdminPassword, store)
 
 	// Start server
 	addr := ":" + cfg.AppPort

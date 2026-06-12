@@ -19,6 +19,7 @@ type Config struct {
 	DBSSLMode        string
 	UploadDir        string
 	PaymentUploadDir string
+	EventsUploadDir  string
 	FrontendDir      string
 
 	// Admin credentials (set via env, never hardcoded in production)
@@ -44,6 +45,7 @@ func Load() *Config {
 		DBSSLMode:        getEnv("DB_SSLMODE", "disable"),
 		UploadDir:        getEnv("UPLOAD_DIR", "./uploads"),
 		PaymentUploadDir: getEnv("PAYMENT_UPLOAD_DIR", "../storage/payments"),
+		EventsUploadDir:  getEnv("EVENTS_UPLOAD_DIR", "../storage/events"),
 		FrontendDir:      getEnv("FRONTEND_DIR", "../frontend"),
 
 		AdminUsername: getEnv("ADMIN_USERNAME", "admin"),

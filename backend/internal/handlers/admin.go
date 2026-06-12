@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"html/template"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -42,6 +44,28 @@ type AdminParticipantDetailData struct {
 	Participant *models.Participant
 	Event       *models.Event
 	PaymentURL  string
+	Stats       *services.ParticipantStats
+}
+
+type AdminEventsData struct {
+	AdminUser string
+	Events    []models.Event
+	Stats     *services.ParticipantStats
+}
+
+type AdminEventCreateData struct {
+	AdminUser string
+	Errors    []string
+	Form      map[string]string
+	Stats     *services.ParticipantStats
+}
+
+type AdminEventEditData struct {
+	AdminUser string
+	Event     *models.Event
+	Errors    []string
+	Form      map[string]string
+	Stats     *services.ParticipantStats
 }
 
 // ─────────────────────── Handler ───────────────────────
@@ -54,6 +78,7 @@ type AdminHandler struct {
 	adminUsername      string
 	adminPassword      string
 	paymentDir         string
+	eventsDir          string
 	tmpl               *template.Template
 }
 
@@ -62,10 +87,19 @@ func NewAdminHandler(
 	participantService *services.ParticipantService,
 	eventService *services.EventService,
 	store *session.Store,
-	adminUsername, adminPassword, paymentDir string,
+	adminUsername, adminPassword, paymentDir, eventsDir string,
 ) (*AdminHandler, error) {
 	funcMap := buildAdminFuncMap()
-	t, err := template.New("").Funcs(funcMap).ParseFS(templ.Files, "admin_login.html", "admin_dashboard.html", "admin_participants.html", "admin_participant.html")
+	t, err := template.New("").Funcs(funcMap).ParseFS(
+		templ.Files,
+		"admin_login.html",
+		"admin_dashboard.html",
+		"admin_participants.html",
+		"admin_participant.html",
+		"admin_events.html",
+		"admin_event_create.html",
+		"admin_event_edit.html",
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse admin templates: %w", err)
 	}
@@ -76,6 +110,7 @@ func NewAdminHandler(
 		adminUsername:      adminUsername,
 		adminPassword:      adminPassword,
 		paymentDir:         paymentDir,
+		eventsDir:          eventsDir,
 		tmpl:               t,
 	}, nil
 }
@@ -196,11 +231,14 @@ func (h *AdminHandler) ParticipantDetail(c *fiber.Ctx) error {
 		paymentURL = "/payments/" + participant.PaymentProof
 	}
 
+	stats, _ := h.participantService.GetStats()
+
 	return h.render(c, "admin_participant.html", AdminParticipantDetailData{
 		AdminUser:   adminUser,
 		Participant: participant,
 		Event:       event,
 		PaymentURL:  paymentURL,
+		Stats:       stats,
 	})
 }
 
@@ -232,6 +270,450 @@ func (h *AdminHandler) UpdateStatus(c *fiber.Ctx) error {
 	}
 
 	return c.Redirect(fmt.Sprintf("/admin/participants/%d", id), fiber.StatusSeeOther)
+}
+
+// EventList handles GET /admin/events
+func (h *AdminHandler) EventList(c *fiber.Ctx) error {
+	events, err := h.eventService.GetAll()
+	if err != nil {
+		events = []models.Event{}
+	}
+	adminUser, _ := c.Locals("admin_username").(string)
+	stats, _ := h.participantService.GetStats()
+	return h.render(c, "admin_events.html", AdminEventsData{
+		AdminUser: adminUser,
+		Events:    events,
+		Stats:     stats,
+	})
+}
+
+// EventCreatePage handles GET /admin/events/create
+func (h *AdminHandler) EventCreatePage(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	stats, _ := h.participantService.GetStats()
+	return h.render(c, "admin_event_create.html", AdminEventCreateData{
+		AdminUser: adminUser,
+		Form:      map[string]string{},
+		Stats:     stats,
+	})
+}
+
+// EventCreateSubmit handles POST /admin/events/create
+func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+
+	title := strings.TrimSpace(c.FormValue("title"))
+	slug := strings.TrimSpace(strings.ToLower(c.FormValue("slug")))
+	description := strings.TrimSpace(c.FormValue("description"))
+	eventDateStr := c.FormValue("event_date")
+	eventTime := strings.TrimSpace(c.FormValue("event_time"))
+	location := strings.TrimSpace(c.FormValue("location"))
+	priceStr := strings.TrimSpace(c.FormValue("price"))
+	paymentBank := strings.TrimSpace(c.FormValue("payment_bank"))
+	paymentAccountNumber := strings.TrimSpace(c.FormValue("payment_account_number"))
+	paymentAccountName := strings.TrimSpace(c.FormValue("payment_account_name"))
+	adminName := strings.TrimSpace(c.FormValue("admin_name"))
+	adminWhatsapp := strings.TrimSpace(c.FormValue("admin_whatsapp"))
+	maxParticipantsStr := strings.TrimSpace(c.FormValue("max_participants"))
+	regOpenStr := c.FormValue("registration_open")
+	regCloseStr := c.FormValue("registration_close")
+	status := strings.ToUpper(strings.TrimSpace(c.FormValue("status")))
+
+	formValues := map[string]string{
+		"title":                  title,
+		"slug":                   slug,
+		"description":            description,
+		"event_date":             eventDateStr,
+		"event_time":             eventTime,
+		"location":               location,
+		"price":                  priceStr,
+		"payment_bank":           paymentBank,
+		"payment_account_number": paymentAccountNumber,
+		"payment_account_name":   paymentAccountName,
+		"admin_name":             adminName,
+		"admin_whatsapp":         adminWhatsapp,
+		"max_participants":       maxParticipantsStr,
+		"registration_open":      regOpenStr,
+		"registration_close":     regCloseStr,
+		"status":                 status,
+	}
+
+	var errs []string
+	if title == "" { errs = append(errs, "Judul Acara wajib diisi") }
+	if slug == "" { errs = append(errs, "Slug Acara wajib diisi") }
+	if location == "" { errs = append(errs, "Lokasi wajib diisi") }
+	if adminName == "" { errs = append(errs, "Nama Admin wajib diisi") }
+	if adminWhatsapp == "" { errs = append(errs, "WhatsApp Admin wajib diisi") }
+
+	slugRegex := regexp.MustCompile(`^[a-z0-9-_]+$`)
+	if slug != "" && !slugRegex.MatchString(slug) {
+		errs = append(errs, "Slug hanya boleh berisi huruf kecil, angka, tanda hubung (-), dan garis bawah (_)")
+	}
+
+	if slug != "" {
+		if _, err := h.eventService.GetBySlug(slug); err == nil {
+			errs = append(errs, "Slug sudah digunakan oleh acara lain")
+		}
+	}
+
+	var eventDate time.Time
+	var err error
+	if eventDateStr != "" {
+		eventDate, err = time.Parse("2006-01-02", eventDateStr)
+		if err != nil {
+			errs = append(errs, "Format Tanggal Acara tidak valid")
+		}
+	} else {
+		errs = append(errs, "Tanggal Acara wajib diisi")
+	}
+
+	var regOpen time.Time
+	if regOpenStr != "" {
+		regOpen, err = time.Parse("2006-01-02T15:04", regOpenStr)
+		if err != nil {
+			errs = append(errs, "Format Tanggal Pendaftaran Dibuka tidak valid (gunakan format lokal YYYY-MM-DDTHH:MM)")
+		}
+	}
+
+	var regClose time.Time
+	if regCloseStr != "" {
+		regClose, err = time.Parse("2006-01-02T15:04", regCloseStr)
+		if err != nil {
+			errs = append(errs, "Format Tanggal Pendaftaran Ditutup tidak valid (gunakan format lokal YYYY-MM-DDTHH:MM)")
+		}
+	}
+
+	price := 0.0
+	if priceStr != "" {
+		price, err = strconv.ParseFloat(priceStr, 64)
+		if err != nil || price < 0 {
+			errs = append(errs, "Format Biaya Pendaftaran tidak valid")
+		}
+	}
+
+	maxParticipants := 0
+	if maxParticipantsStr != "" {
+		maxParticipants, err = strconv.Atoi(maxParticipantsStr)
+		if err != nil || maxParticipants < 0 {
+			errs = append(errs, "Format Maksimum Peserta tidak valid")
+		}
+	}
+
+	allowedStatus := map[string]bool{"DRAFT": true, "PUBLISHED": true, "CLOSED": true}
+	if status == "" {
+		status = "DRAFT"
+	} else if !allowedStatus[status] {
+		errs = append(errs, "Status tidak valid")
+	}
+
+	// Image upload
+	bannerFilename := ""
+	file, err := c.FormFile("banner_image")
+	if err == nil && file != nil {
+		ext := strings.ToLower(filepath.Ext(file.Filename))
+		allowedExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true}
+		if !allowedExts[ext] {
+			errs = append(errs, "Format Banner hanya boleh JPG, JPEG, PNG, atau WEBP")
+		} else if file.Size > 10*1024*1024 {
+			errs = append(errs, "Ukuran Banner maksimal 10MB")
+		} else {
+			bannerFilename = fmt.Sprintf("banner_%d%s", time.Now().UnixNano(), ext)
+			err = c.SaveFile(file, filepath.Join(h.eventsDir, bannerFilename))
+			if err != nil {
+				errs = append(errs, "Gagal mengunggah Banner: "+err.Error())
+			}
+		}
+	}
+
+	if len(errs) > 0 {
+		stats, _ := h.participantService.GetStats()
+		return h.render(c, "admin_event_create.html", AdminEventCreateData{
+			AdminUser: adminUser,
+			Errors:    errs,
+			Form:      formValues,
+			Stats:     stats,
+		})
+	}
+
+	newEvent := &models.Event{
+		Title:                title,
+		Slug:                 slug,
+		Description:          description,
+		BannerImage:          bannerFilename,
+		EventDate:            eventDate,
+		EventTime:            eventTime,
+		Location:             location,
+		Price:                price,
+		PaymentBank:          paymentBank,
+		PaymentAccountNumber: paymentAccountNumber,
+		PaymentAccountName:   paymentAccountName,
+		AdminName:            adminName,
+		AdminWhatsapp:        adminWhatsapp,
+		MaxParticipants:      maxParticipants,
+		RegistrationOpen:     regOpen,
+		RegistrationClose:    regClose,
+		Status:               status,
+	}
+
+	if err := h.eventService.Create(newEvent); err != nil {
+		errs = append(errs, "Gagal menyimpan Acara: "+err.Error())
+		stats, _ := h.participantService.GetStats()
+		return h.render(c, "admin_event_create.html", AdminEventCreateData{
+			AdminUser: adminUser,
+			Errors:    errs,
+			Form:      formValues,
+			Stats:     stats,
+		})
+	}
+
+	return c.Redirect("/admin/events", fiber.StatusSeeOther)
+}
+
+// EventEditPage handles GET /admin/events/:id/edit
+func (h *AdminHandler) EventEditPage(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		return c.Redirect("/admin/events", fiber.StatusSeeOther)
+	}
+
+	event, err := h.eventService.GetByID(uint(id))
+	if err != nil {
+		return c.Redirect("/admin/events", fiber.StatusSeeOther)
+	}
+
+	adminUser, _ := c.Locals("admin_username").(string)
+
+	formValues := map[string]string{
+		"title":                  event.Title,
+		"slug":                   event.Slug,
+		"description":            event.Description,
+		"event_date":             event.EventDate.Format("2006-01-02"),
+		"event_time":             event.EventTime,
+		"location":               event.Location,
+		"price":                  fmt.Sprintf("%.0f", event.Price),
+		"payment_bank":           event.PaymentBank,
+		"payment_account_number": event.PaymentAccountNumber,
+		"payment_account_name":   event.PaymentAccountName,
+		"admin_name":             event.AdminName,
+		"admin_whatsapp":         event.AdminWhatsapp,
+		"max_participants":       strconv.Itoa(event.MaxParticipants),
+		"status":                 event.Status,
+	}
+	if !event.RegistrationOpen.IsZero() {
+		formValues["registration_open"] = event.RegistrationOpen.Format("2006-01-02T15:04")
+	}
+	if !event.RegistrationClose.IsZero() {
+		formValues["registration_close"] = event.RegistrationClose.Format("2006-01-02T15:04")
+	}
+
+	stats, _ := h.participantService.GetStats()
+
+	return h.render(c, "admin_event_edit.html", AdminEventEditData{
+		AdminUser: adminUser,
+		Event:     event,
+		Form:      formValues,
+		Stats:     stats,
+	})
+}
+
+// EventEditSubmit handles POST /admin/events/:id/edit
+func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		return c.Redirect("/admin/events", fiber.StatusSeeOther)
+	}
+
+	event, err := h.eventService.GetByID(uint(id))
+	if err != nil {
+		return c.Redirect("/admin/events", fiber.StatusSeeOther)
+	}
+
+	adminUser, _ := c.Locals("admin_username").(string)
+
+	title := strings.TrimSpace(c.FormValue("title"))
+	slug := strings.TrimSpace(strings.ToLower(c.FormValue("slug")))
+	description := strings.TrimSpace(c.FormValue("description"))
+	eventDateStr := c.FormValue("event_date")
+	eventTime := strings.TrimSpace(c.FormValue("event_time"))
+	location := strings.TrimSpace(c.FormValue("location"))
+	priceStr := strings.TrimSpace(c.FormValue("price"))
+	paymentBank := strings.TrimSpace(c.FormValue("payment_bank"))
+	paymentAccountNumber := strings.TrimSpace(c.FormValue("payment_account_number"))
+	paymentAccountName := strings.TrimSpace(c.FormValue("payment_account_name"))
+	adminName := strings.TrimSpace(c.FormValue("admin_name"))
+	adminWhatsapp := strings.TrimSpace(c.FormValue("admin_whatsapp"))
+	maxParticipantsStr := strings.TrimSpace(c.FormValue("max_participants"))
+	regOpenStr := c.FormValue("registration_open")
+	regCloseStr := c.FormValue("registration_close")
+	status := strings.ToUpper(strings.TrimSpace(c.FormValue("status")))
+
+	formValues := map[string]string{
+		"title":                  title,
+		"slug":                   slug,
+		"description":            description,
+		"event_date":             eventDateStr,
+		"event_time":             eventTime,
+		"location":               location,
+		"price":                  priceStr,
+		"payment_bank":           paymentBank,
+		"payment_account_number": paymentAccountNumber,
+		"payment_account_name":   paymentAccountName,
+		"admin_name":             adminName,
+		"admin_whatsapp":         adminWhatsapp,
+		"max_participants":       maxParticipantsStr,
+		"registration_open":      regOpenStr,
+		"registration_close":     regCloseStr,
+		"status":                 status,
+	}
+
+	var errs []string
+	if title == "" { errs = append(errs, "Judul Acara wajib diisi") }
+	if slug == "" { errs = append(errs, "Slug Acara wajib diisi") }
+	if location == "" { errs = append(errs, "Lokasi wajib diisi") }
+	if adminName == "" { errs = append(errs, "Nama Admin wajib diisi") }
+	if adminWhatsapp == "" { errs = append(errs, "WhatsApp Admin wajib diisi") }
+
+	slugRegex := regexp.MustCompile(`^[a-z0-9-_]+$`)
+	if slug != "" && !slugRegex.MatchString(slug) {
+		errs = append(errs, "Slug hanya boleh berisi huruf kecil, angka, tanda hubung (-), dan garis bawah (_)")
+	}
+
+	if slug != "" && slug != event.Slug {
+		if _, err := h.eventService.GetBySlug(slug); err == nil {
+			errs = append(errs, "Slug sudah digunakan oleh acara lain")
+		}
+	}
+
+	var eventDate time.Time
+	if eventDateStr != "" {
+		eventDate, err = time.Parse("2006-01-02", eventDateStr)
+		if err != nil {
+			errs = append(errs, "Format Tanggal Acara tidak valid")
+		}
+	} else {
+		errs = append(errs, "Tanggal Acara wajib diisi")
+	}
+
+	var regOpen time.Time
+	if regOpenStr != "" {
+		regOpen, err = time.Parse("2006-01-02T15:04", regOpenStr)
+		if err != nil {
+			errs = append(errs, "Format Tanggal Pendaftaran Dibuka tidak valid (gunakan format lokal YYYY-MM-DDTHH:MM)")
+		}
+	}
+
+	var regClose time.Time
+	if regCloseStr != "" {
+		regClose, err = time.Parse("2006-01-02T15:04", regCloseStr)
+		if err != nil {
+			errs = append(errs, "Format Tanggal Pendaftaran Ditutup tidak valid (gunakan format lokal YYYY-MM-DDTHH:MM)")
+		}
+	}
+
+	price := 0.0
+	if priceStr != "" {
+		price, err = strconv.ParseFloat(priceStr, 64)
+		if err != nil || price < 0 {
+			errs = append(errs, "Format Biaya Pendaftaran tidak valid")
+		}
+	}
+
+	maxParticipants := 0
+	if maxParticipantsStr != "" {
+		maxParticipants, err = strconv.Atoi(maxParticipantsStr)
+		if err != nil || maxParticipants < 0 {
+			errs = append(errs, "Format Maksimum Peserta tidak valid")
+		}
+	}
+
+	allowedStatus := map[string]bool{"DRAFT": true, "PUBLISHED": true, "CLOSED": true}
+	if status == "" {
+		status = "DRAFT"
+	} else if !allowedStatus[status] {
+		errs = append(errs, "Status tidak valid")
+	}
+
+	// Banner image update
+	bannerFilename := event.BannerImage
+	file, err := c.FormFile("banner_image")
+	if err == nil && file != nil {
+		ext := strings.ToLower(filepath.Ext(file.Filename))
+		allowedExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true}
+		if !allowedExts[ext] {
+			errs = append(errs, "Format Banner hanya boleh JPG, JPEG, PNG, atau WEBP")
+		} else if file.Size > 10*1024*1024 {
+			errs = append(errs, "Ukuran Banner maksimal 10MB")
+		} else {
+			bannerFilename = fmt.Sprintf("banner_%d%s", time.Now().UnixNano(), ext)
+			err = c.SaveFile(file, filepath.Join(h.eventsDir, bannerFilename))
+			if err != nil {
+				errs = append(errs, "Gagal mengunggah Banner: "+err.Error())
+			}
+		}
+	}
+
+	if len(errs) > 0 {
+		stats, _ := h.participantService.GetStats()
+		return h.render(c, "admin_event_edit.html", AdminEventEditData{
+			AdminUser: adminUser,
+			Event:     event,
+			Errors:    errs,
+			Form:      formValues,
+			Stats:     stats,
+		})
+	}
+
+	event.Title = title
+	event.Slug = slug
+	event.Description = description
+	event.BannerImage = bannerFilename
+	event.EventDate = eventDate
+	event.EventTime = eventTime
+	event.Location = location
+	event.Price = price
+	event.PaymentBank = paymentBank
+	event.PaymentAccountNumber = paymentAccountNumber
+	event.PaymentAccountName = paymentAccountName
+	event.AdminName = adminName
+	event.AdminWhatsapp = adminWhatsapp
+	event.MaxParticipants = maxParticipants
+	event.RegistrationOpen = regOpen
+	event.RegistrationClose = regClose
+	event.Status = status
+
+	if err := h.eventService.Update(event); err != nil {
+		errs = append(errs, "Gagal memperbarui Acara: "+err.Error())
+		stats, _ := h.participantService.GetStats()
+		return h.render(c, "admin_event_edit.html", AdminEventEditData{
+			AdminUser: adminUser,
+			Event:     event,
+			Errors:    errs,
+			Form:      formValues,
+			Stats:     stats,
+		})
+	}
+
+	return c.Redirect("/admin/events", fiber.StatusSeeOther)
+}
+
+// EventDelete handles POST /admin/events/:id/delete or DELETE /admin/events/:id
+func (h *AdminHandler) EventDelete(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ID"})
+	}
+
+	if err := h.eventService.Delete(uint(id)); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// For HTMX delete requests, we trigger a redirect or return empty content
+	if c.Get("HX-Request") == "true" {
+		c.Set("HX-Redirect", "/admin/events")
+		return c.SendStatus(fiber.StatusOK)
+	}
+
+	return c.Redirect("/admin/events", fiber.StatusSeeOther)
 }
 
 // ─────────────────────── Helpers ───────────────────────

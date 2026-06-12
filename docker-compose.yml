@@ -38,6 +38,7 @@ services:
       DB_SSLMODE: disable
       UPLOAD_DIR: /app/storage/uploads
       PAYMENT_UPLOAD_DIR: /app/storage/payments
+      EVENTS_UPLOAD_DIR: /app/storage/events
       FRONTEND_DIR: /app/frontend
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD: admin123

@@ -36,15 +36,50 @@ func (s *EventService) GetByID(id uint) (*models.Event, error) {
 	return &event, result.Error
 }
 
-// GetFirst returns the first active event (earliest by created_at)
+// GetBySlug returns a single event by Slug
+func (s *EventService) GetBySlug(slug string) (*models.Event, error) {
+	var event models.Event
+	result := s.db.Where("slug = ?", slug).First(&event)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("event with slug %s not found", slug)
+	}
+	return &event, result.Error
+}
+
+// GetFirst returns the first active published event (earliest by created_at)
 // This is used for the single-event landing page flow
 func (s *EventService) GetFirst() (*models.Event, error) {
 	var event models.Event
-	result := s.db.Order("created_at ASC").First(&event)
+	result := s.db.Where("status = ?", "PUBLISHED").Order("created_at ASC").First(&event)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return nil, fmt.Errorf("no events found")
+		return nil, fmt.Errorf("no published events found")
 	}
 	return &event, result.Error
+}
+
+// Create saves a new event to the database
+func (s *EventService) Create(event *models.Event) error {
+	return s.db.Create(event).Error
+}
+
+// Update updates an existing event in the database
+func (s *EventService) Update(event *models.Event) error {
+	return s.db.Save(event).Error
+}
+
+// Delete removes an event and all its associated participants
+func (s *EventService) Delete(id uint) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		// Delete participants first to satisfy foreign key constraints
+		if err := tx.Where("event_id = ?", id).Delete(&models.Participant{}).Error; err != nil {
+			return err
+		}
+		// Delete event
+		if err := tx.Delete(&models.Event{}, id).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // SeedSampleIfEmpty creates a demo event if the events table is empty
@@ -59,6 +94,7 @@ func (s *EventService) SeedSampleIfEmpty() error {
 
 	sample := models.Event{
 		Title: "Industrial Technology Summit 2025",
+		Slug:  "industrial-technology-summit-2025",
 		Description: `Bergabunglah bersama kami dalam acara pertemuan teknologi industri terbesar tahun ini. Jalin jaringan dengan para pemimpin industri, jelajahi solusi otomasi terkini, dan dapatkan wawasan mendalam tentang masa depan manufaktur dan kawasan industri di Asia Tenggara.
 
 Topik yang akan dibahas:
@@ -68,6 +104,7 @@ Topik yang akan dibahas:
 • Studi Kasus Transformasi Digital
 • Keamanan dan Keselamatan Industri`,
 		EventDate:            eventDate,
+		EventTime:            "09:00 - 17:00",
 		Location:             "Jakarta Convention Center, Hall A, Jakarta Pusat",
 		Price:                350000,
 		PaymentBank:          "Bank Central Asia (BCA)",
@@ -75,6 +112,10 @@ Topik yang akan dibahas:
 		PaymentAccountName:   "PT GatherHub Indonesia",
 		AdminName:            "Budi Santoso",
 		AdminWhatsapp:        "6281234567890",
+		MaxParticipants:      100,
+		RegistrationOpen:     time.Now().Add(-24 * time.Hour),
+		RegistrationClose:    time.Now().Add(30 * 24 * time.Hour),
+		Status:               "PUBLISHED",
 	}
 
 	return s.db.Create(&sample).Error

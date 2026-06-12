@@ -12,7 +12,7 @@ import (
 )
 
 // Register sets up all application routes
-func Register(app *fiber.App, db *gorm.DB, paymentUploadDir, adminUsername, adminPassword string, store *session.Store) {
+func Register(app *fiber.App, db *gorm.DB, paymentUploadDir, eventsUploadDir, adminUsername, adminPassword string, store *session.Store) {
 	// ── Services ──────────────────────────────────────────
 	eventService := services.NewEventService(db)
 	participantService := services.NewParticipantService(db, paymentUploadDir)
@@ -25,7 +25,7 @@ func Register(app *fiber.App, db *gorm.DB, paymentUploadDir, adminUsername, admi
 		log.Fatalf("Failed to initialise page handler: %v", err)
 	}
 
-	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminUsername, adminPassword, paymentUploadDir)
+	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminUsername, adminPassword, paymentUploadDir, eventsUploadDir)
 	if err != nil {
 		log.Fatalf("Failed to initialise admin handler: %v", err)
 	}
@@ -69,6 +69,15 @@ func Register(app *fiber.App, db *gorm.DB, paymentUploadDir, adminUsername, admi
 	admin.Get("/participants", adminHandler.ParticipantList)
 	admin.Get("/participants/:id", adminHandler.ParticipantDetail)
 	admin.Post("/participants/:id/status", adminHandler.UpdateStatus)
+
+	// Event management routes
+	admin.Get("/events", adminHandler.EventList)
+	admin.Get("/events/create", adminHandler.EventCreatePage)
+	admin.Post("/events/create", adminHandler.EventCreateSubmit)
+	admin.Get("/events/:id/edit", adminHandler.EventEditPage)
+	admin.Post("/events/:id/edit", adminHandler.EventEditSubmit)
+	admin.Delete("/events/:id", adminHandler.EventDelete)
+	admin.Post("/events/:id/delete", adminHandler.EventDelete)
 
 	app.Get("/admin", func(c *fiber.Ctx) error {
 		return c.Redirect("/admin/dashboard", fiber.StatusSeeOther)
