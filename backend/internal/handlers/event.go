@@ -141,7 +141,7 @@ func renderEventCard(ev models.Event) string {
 
 	return fmt.Sprintf(`
 <article class="event-card glass-card rounded-3xl overflow-hidden group cursor-pointer"
-         onclick="window.location.href='/event.html?id=%d'">
+         onclick="window.location.href='/event/%s'">
   <div class="h-3 bg-gradient-to-r from-brand-500 to-purple-600"></div>
   <div class="p-8">
     <div class="flex items-start justify-between gap-4 mb-4">
@@ -165,7 +165,7 @@ func renderEventCard(ev models.Event) string {
       </div>
     </div>
 
-    <a href="/event.html?id=%d"
+    <a href="/event/%s"
        class="inline-flex items-center gap-2 btn-primary text-sm font-semibold px-5 py-2.5 rounded-xl text-white">
       View Details
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -174,14 +174,14 @@ func renderEventCard(ev models.Event) string {
     </a>
   </div>
 </article>`,
-		ev.ID,
+		esc(ev.Slug),
 		esc(ev.Title),
 		priceClass,
 		esc(price),
 		formatDate(ev.EventDate),
 		formatTime(ev.EventDate),
 		esc(ev.Location),
-		ev.ID,
+		esc(ev.Slug),
 	)
 }
 
@@ -292,7 +292,7 @@ func renderEventDetail(ev models.Event) string {
 
   <!-- Register CTA -->
   <div class="pt-2">
-    <a id="register-btn" href="/register.html?event_id=%d"
+    <a id="register-btn" href="/register"
        class="btn-primary w-full flex items-center justify-center gap-3 font-bold px-8 py-4 rounded-2xl text-base text-white">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
@@ -312,6 +312,5 @@ func renderEventDetail(ev models.Event) string {
 		esc(ev.AdminName),
 		esc(ev.AdminWhatsapp),
 		esc(ev.AdminWhatsapp),
-		ev.ID,
 	)
 }

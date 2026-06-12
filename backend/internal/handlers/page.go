@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/gatherhub/backend/internal/models"
-	templ "github.com/gatherhub/backend/internal/templates"
 	"github.com/gatherhub/backend/internal/services"
+	templ "github.com/gatherhub/backend/internal/templates"
 	"github.com/gofiber/fiber/v2"
 )
 

@@ -463,4 +463,3 @@ func (s *ParticipantService) GetLatestVerifications(eventID uint, limit int) ([]
 	err := q.Preload("Event").Order("verified_at DESC").Limit(limit).Find(&participants).Error
 	return participants, err
 }
-

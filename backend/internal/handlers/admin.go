@@ -482,6 +482,7 @@ func (h *AdminHandler) UpdateStatus(c *fiber.Ctx) error {
 
 	return c.Redirect(fmt.Sprintf("/admin/participants/%d", id), fiber.StatusSeeOther)
 }
+
 // ExportParticipants handles GET /admin/participants/export
 // Generates and streams a .xlsx file of all participants (respects status/search filters).
 func (h *AdminHandler) ExportParticipants(c *fiber.Ctx) error {
@@ -509,8 +510,8 @@ func (h *AdminHandler) ExportParticipants(c *fiber.Ctx) error {
 
 	// ── Header style ──────────────────────────────────────────
 	headerStyle, _ := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{Bold: true, Color: "FFFFFF", Size: 11},
-		Fill: excelize.Fill{Type: "pattern", Color: []string{"4F46E5"}, Pattern: 1},
+		Font:      &excelize.Font{Bold: true, Color: "FFFFFF", Size: 11},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{"4F46E5"}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true},
 		Border: []excelize.Border{
 			{Type: "left", Color: "CCCCCC", Style: 1},
@@ -701,11 +702,21 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 	}
 
 	var errs []string
-	if title == "" { errs = append(errs, "Judul Acara wajib diisi") }
-	if slug == "" { errs = append(errs, "Slug Acara wajib diisi") }
-	if location == "" { errs = append(errs, "Lokasi wajib diisi") }
-	if adminName == "" { errs = append(errs, "Nama Admin wajib diisi") }
-	if adminWhatsapp == "" { errs = append(errs, "WhatsApp Admin wajib diisi") }
+	if title == "" {
+		errs = append(errs, "Judul Acara wajib diisi")
+	}
+	if slug == "" {
+		errs = append(errs, "Slug Acara wajib diisi")
+	}
+	if location == "" {
+		errs = append(errs, "Lokasi wajib diisi")
+	}
+	if adminName == "" {
+		errs = append(errs, "Nama Admin wajib diisi")
+	}
+	if adminWhatsapp == "" {
+		errs = append(errs, "WhatsApp Admin wajib diisi")
+	}
 
 	slugRegex := regexp.MustCompile(`^[a-z0-9-_]+$`)
 	if slug != "" && !slugRegex.MatchString(slug) {
@@ -934,11 +945,21 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 	}
 
 	var errs []string
-	if title == "" { errs = append(errs, "Judul Acara wajib diisi") }
-	if slug == "" { errs = append(errs, "Slug Acara wajib diisi") }
-	if location == "" { errs = append(errs, "Lokasi wajib diisi") }
-	if adminName == "" { errs = append(errs, "Nama Admin wajib diisi") }
-	if adminWhatsapp == "" { errs = append(errs, "WhatsApp Admin wajib diisi") }
+	if title == "" {
+		errs = append(errs, "Judul Acara wajib diisi")
+	}
+	if slug == "" {
+		errs = append(errs, "Slug Acara wajib diisi")
+	}
+	if location == "" {
+		errs = append(errs, "Lokasi wajib diisi")
+	}
+	if adminName == "" {
+		errs = append(errs, "Nama Admin wajib diisi")
+	}
+	if adminWhatsapp == "" {
+		errs = append(errs, "WhatsApp Admin wajib diisi")
+	}
 
 	slugRegex := regexp.MustCompile(`^[a-z0-9-_]+$`)
 	if slug != "" && !slugRegex.MatchString(slug) {
@@ -1144,7 +1165,7 @@ func (h *AdminHandler) EventUpdateStatus(c *fiber.Ctx) error {
 		"CLOSED":    "ditutup",
 		"DRAFT":     "dikembalikan ke Draft",
 	}
-	setFlash(c, "success", "Acara \"" + event.Title + "\" berhasil " + statusLabels[status] + ".")
+	setFlash(c, "success", "Acara \""+event.Title+"\" berhasil "+statusLabels[status]+".")
 	return c.Redirect(fmt.Sprintf("/admin/events/%d", id), fiber.StatusSeeOther)
 }
 
@@ -1348,11 +1369,21 @@ func (h *AdminHandler) AdminCreateSubmit(c *fiber.Ctx) error {
 	}
 
 	var errs []string
-	if name == "" { errs = append(errs, "Nama Lengkap wajib diisi") }
-	if username == "" { errs = append(errs, "Username wajib diisi") }
-	if email == "" { errs = append(errs, "Email wajib diisi") }
-	if password == "" { errs = append(errs, "Password wajib diisi") }
-	if role != "SUPER_ADMIN" && role != "ADMIN" { errs = append(errs, "Role tidak valid") }
+	if name == "" {
+		errs = append(errs, "Nama Lengkap wajib diisi")
+	}
+	if username == "" {
+		errs = append(errs, "Username wajib diisi")
+	}
+	if email == "" {
+		errs = append(errs, "Email wajib diisi")
+	}
+	if password == "" {
+		errs = append(errs, "Password wajib diisi")
+	}
+	if role != "SUPER_ADMIN" && role != "ADMIN" {
+		errs = append(errs, "Role tidak valid")
+	}
 
 	// Check if username/email already exists
 	if username != "" {
@@ -1472,9 +1503,15 @@ func (h *AdminHandler) AdminEditSubmit(c *fiber.Ctx) error {
 	}
 
 	var errs []string
-	if name == "" { errs = append(errs, "Nama Lengkap wajib diisi") }
-	if email == "" { errs = append(errs, "Email wajib diisi") }
-	if role != "SUPER_ADMIN" && role != "ADMIN" { errs = append(errs, "Role tidak valid") }
+	if name == "" {
+		errs = append(errs, "Nama Lengkap wajib diisi")
+	}
+	if email == "" {
+		errs = append(errs, "Email wajib diisi")
+	}
+	if role != "SUPER_ADMIN" && role != "ADMIN" {
+		errs = append(errs, "Role tidak valid")
+	}
 
 	// Check email uniqueness if modified
 	if email != "" && email != admin.Email {
@@ -1592,8 +1629,12 @@ func (h *AdminHandler) SystemSettingsSubmit(c *fiber.Ctx) error {
 	maxUploadSize := strings.TrimSpace(c.FormValue("max_upload_size"))
 
 	var errs []string
-	if platformName == "" { errs = append(errs, "Nama Platform wajib diisi") }
-	if maxUploadSize == "" { errs = append(errs, "Maksimum Upload wajib diisi") }
+	if platformName == "" {
+		errs = append(errs, "Nama Platform wajib diisi")
+	}
+	if maxUploadSize == "" {
+		errs = append(errs, "Maksimum Upload wajib diisi")
+	}
 
 	if len(errs) > 0 {
 		return h.render(c, "admin_settings.html", AdminSettingsData{
@@ -1703,7 +1744,7 @@ func buildAdminFuncMap() template.FuncMap {
 			return strings.ToLower(filepath.Ext(filename)) == ".pdf"
 		},
 		"isEq": func(a, b string) bool { return a == b },
-		"add": func(a, b int) int { return a + b },
+		"add":  func(a, b int) int { return a + b },
 		"truncate": func(n int, s string) string {
 			if len(s) <= n {
 				return s
