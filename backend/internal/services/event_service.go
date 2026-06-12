@@ -36,6 +36,17 @@ func (s *EventService) GetByID(id uint) (*models.Event, error) {
 	return &event, result.Error
 }
 
+// GetFirst returns the first active event (earliest by created_at)
+// This is used for the single-event landing page flow
+func (s *EventService) GetFirst() (*models.Event, error) {
+	var event models.Event
+	result := s.db.Order("created_at ASC").First(&event)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("no events found")
+	}
+	return &event, result.Error
+}
+
 // SeedSampleIfEmpty creates a demo event if the events table is empty
 func (s *EventService) SeedSampleIfEmpty() error {
 	var count int64
@@ -48,17 +59,16 @@ func (s *EventService) SeedSampleIfEmpty() error {
 
 	sample := models.Event{
 		Title: "Industrial Technology Summit 2025",
-		Description: `Join us for the premier industrial technology gathering of the year. 
-Network with industry leaders, explore cutting-edge automation solutions, 
-and gain insights into the future of manufacturing and industrial estates in Southeast Asia.
+		Description: `Bergabunglah bersama kami dalam acara pertemuan teknologi industri terbesar tahun ini. Jalin jaringan dengan para pemimpin industri, jelajahi solusi otomasi terkini, dan dapatkan wawasan mendalam tentang masa depan manufaktur dan kawasan industri di Asia Tenggara.
 
-Topics covered:
+Topik yang akan dibahas:
 • Smart Factory & Industry 4.0
-• IoT Integration in Manufacturing
-• Sustainable Industrial Practices
-• Digital Transformation Case Studies`,
+• Integrasi IoT dalam Manufaktur
+• Praktik Industri Berkelanjutan
+• Studi Kasus Transformasi Digital
+• Keamanan dan Keselamatan Industri`,
 		EventDate:            eventDate,
-		Location:             "Jakarta Convention Center, Jakarta, Indonesia",
+		Location:             "Jakarta Convention Center, Hall A, Jakarta Pusat",
 		Price:                350000,
 		PaymentBank:          "Bank Central Asia (BCA)",
 		PaymentAccountNumber: "1234567890",

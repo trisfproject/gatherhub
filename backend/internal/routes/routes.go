@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"log"
+
 	"github.com/gatherhub/backend/internal/handlers"
 	"github.com/gatherhub/backend/internal/services"
 	"github.com/gofiber/fiber/v2"
@@ -9,35 +11,48 @@ import (
 
 // Register sets up all application routes
 func Register(app *fiber.App, db *gorm.DB, paymentUploadDir string) {
-	// Initialize services
+	// ── Services ──────────────────────────────────────────
 	eventService := services.NewEventService(db)
 	participantService := services.NewParticipantService(db, paymentUploadDir)
 
-	// Initialize handlers
+	// ── Handlers ──────────────────────────────────────────
 	healthHandler := handlers.NewHealthHandler(db)
-	eventHandler := handlers.NewEventHandler(eventService)
-	participantHandler := handlers.NewParticipantHandler(participantService, eventService)
 
-	// ---- Core Endpoints ----
-	app.Get("/", healthHandler.Root)
+	pageHandler, err := handlers.NewPageHandler(eventService, participantService)
+	if err != nil {
+		log.Fatalf("Failed to initialise page handler: %v", err)
+	}
+
+	// ── Public Page Routes (SSR) ───────────────────────────
+	// Landing page — shows event details with "Daftar Sekarang" CTA
+	app.Get("/", pageHandler.Landing)
+
+	// Registration form — shows payment info + form
+	app.Get("/register", pageHandler.RegisterPage)
+
+	// Registration submit — saves participant, redirects to success
+	app.Post("/register", pageHandler.RegisterSubmit)
+
+	// Success page — shows registration number + status
+	app.Get("/register/success", pageHandler.Success)
+
+	// ── Infrastructure ────────────────────────────────────
 	app.Get("/health", healthHandler.Health)
 
-	// ---- API v1 ----
+	// ── JSON API (v1) ─────────────────────────────────────
 	api := app.Group("/api/v1")
 
-	// Events
+	// Event handlers (JSON)
+	eventHandler := handlers.NewEventHandler(eventService)
 	api.Get("/events", eventHandler.List)
 	api.Get("/events/:id", eventHandler.GetByID)
 
-	// Registration
-	api.Post("/events/:id/register", participantHandler.Register)
-
-	// ---- HTMX Fragment Endpoints ----
+	// HTMX fragment endpoints
 	fragments := app.Group("/fragments")
 	fragments.Get("/events", eventHandler.ListFragment)
 	fragments.Get("/events/:id", eventHandler.GetFragment)
 
-	// ---- 404 Fallback ----
+	// ── 404 Fallback ──────────────────────────────────────
 	app.Use(func(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "Route not found",

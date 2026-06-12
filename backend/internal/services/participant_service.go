@@ -2,9 +2,11 @@ package services
 
 import (
 	"fmt"
+	"io"
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -35,117 +37,155 @@ type RegisterForm struct {
 	JobTitle         string `form:"job_title"` // optional
 }
 
-// Validate performs basic validation on the form
+var emailRegex = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
+var phoneRegex = regexp.MustCompile(`^(\+62|62|0)[0-9]{8,13}$`)
+
+// Validate performs comprehensive validation on the form
+// Returns a slice of Indonesian-language error messages
 func (f *RegisterForm) Validate() []string {
 	var errs []string
+
 	if strings.TrimSpace(f.FullName) == "" {
-		errs = append(errs, "Full Name is required")
+		errs = append(errs, "Nama Lengkap wajib diisi")
+	} else if len(strings.TrimSpace(f.FullName)) < 3 {
+		errs = append(errs, "Nama Lengkap minimal 3 karakter")
 	}
-	if strings.TrimSpace(f.Phone) == "" {
-		errs = append(errs, "WhatsApp number is required")
+
+	phone := strings.TrimSpace(f.Phone)
+	if phone == "" {
+		errs = append(errs, "Nomor WhatsApp wajib diisi")
+	} else if !phoneRegex.MatchString(phone) {
+		errs = append(errs, "Format Nomor WhatsApp tidak valid (contoh: 081234567890)")
 	}
-	if strings.TrimSpace(f.Email) == "" {
-		errs = append(errs, "Email is required")
-	} else if !strings.Contains(f.Email, "@") {
-		errs = append(errs, "Email format is invalid")
+
+	email := strings.TrimSpace(f.Email)
+	if email == "" {
+		errs = append(errs, "Email wajib diisi")
+	} else if !emailRegex.MatchString(email) {
+		errs = append(errs, "Format email tidak valid")
 	}
+
 	if strings.TrimSpace(f.City) == "" {
-		errs = append(errs, "City is required")
+		errs = append(errs, "Kota wajib diisi")
 	}
+
 	if strings.TrimSpace(f.CompanyName) == "" {
-		errs = append(errs, "Company Name is required")
+		errs = append(errs, "Nama Perusahaan wajib diisi")
 	}
+
 	if strings.TrimSpace(f.IndustrialEstate) == "" {
-		errs = append(errs, "Industrial Estate is required")
+		errs = append(errs, "Kawasan Industri wajib diisi")
 	}
+
 	if strings.TrimSpace(f.TelegramUsername) == "" {
-		errs = append(errs, "Telegram Username is required")
+		errs = append(errs, "Username Telegram wajib diisi")
 	}
+
 	return errs
 }
 
-// SavePaymentProof saves the uploaded file and returns the relative file path
-func (s *ParticipantService) SavePaymentProof(file *multipart.FileHeader) (string, error) {
-	// Ensure upload directory exists
-	if err := os.MkdirAll(s.uploadDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create upload directory: %w", err)
+// ValidateFile validates the uploaded payment proof file
+func ValidateFile(file *multipart.FileHeader) error {
+	if file == nil {
+		return fmt.Errorf("Bukti pembayaran wajib diunggah")
 	}
 
 	// Validate file type
 	ext := strings.ToLower(filepath.Ext(file.Filename))
-	allowedExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".pdf": true, ".webp": true}
-	if !allowedExts[ext] {
-		return "", fmt.Errorf("file type %s is not allowed. Use JPG, PNG, PDF, or WEBP", ext)
+	allowed := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".pdf": true}
+	if !allowed[ext] {
+		return fmt.Errorf("Tipe file tidak diizinkan. Gunakan JPG, JPEG, PNG, atau PDF")
 	}
 
-	// Validate file size (max 5MB)
-	if file.Size > 5*1024*1024 {
-		return "", fmt.Errorf("file size exceeds 5MB limit")
+	// Validate file size (max 10MB)
+	if file.Size > 10*1024*1024 {
+		return fmt.Errorf("Ukuran file melebihi batas maksimum 10MB")
 	}
 
-	// Generate unique filename
+	if file.Size == 0 {
+		return fmt.Errorf("File bukti pembayaran tidak boleh kosong")
+	}
+
+	return nil
+}
+
+// SavePaymentProof saves the uploaded file to storage/payments/ and returns the filename
+func (s *ParticipantService) SavePaymentProof(file *multipart.FileHeader) (string, error) {
+	if err := os.MkdirAll(s.uploadDir, 0755); err != nil {
+		return "", fmt.Errorf("gagal membuat direktori upload: %w", err)
+	}
+
+	ext := strings.ToLower(filepath.Ext(file.Filename))
 	filename := fmt.Sprintf("payment_%d%s", time.Now().UnixNano(), ext)
 	fullPath := filepath.Join(s.uploadDir, filename)
 
-	// Open source file
 	src, err := file.Open()
 	if err != nil {
-		return "", fmt.Errorf("failed to open uploaded file: %w", err)
+		return "", fmt.Errorf("gagal membuka file: %w", err)
 	}
 	defer src.Close()
 
-	// Write to destination
 	dst, err := os.Create(fullPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to create destination file: %w", err)
+		return "", fmt.Errorf("gagal menyimpan file: %w", err)
 	}
 	defer dst.Close()
 
-	buf := make([]byte, 32*1024)
-	for {
-		n, readErr := src.Read(buf)
-		if n > 0 {
-			if _, writeErr := dst.Write(buf[:n]); writeErr != nil {
-				return "", fmt.Errorf("failed to write file: %w", writeErr)
-			}
-		}
-		if readErr != nil {
-			break
-		}
+	if _, err := io.Copy(dst, src); err != nil {
+		return "", fmt.Errorf("gagal menulis file: %w", err)
 	}
 
 	return filename, nil
 }
 
-// Create registers a new participant for an event
-func (s *ParticipantService) Create(eventID uint, form *RegisterForm, paymentFilename string) (*models.Participant, error) {
-	participant := &models.Participant{
-		EventID:          eventID,
-		FullName:         strings.TrimSpace(form.FullName),
-		Phone:            strings.TrimSpace(form.Phone),
-		Email:            strings.TrimSpace(strings.ToLower(form.Email)),
-		City:             strings.TrimSpace(form.City),
-		CompanyName:      strings.TrimSpace(form.CompanyName),
-		IndustrialEstate: strings.TrimSpace(form.IndustrialEstate),
-		TelegramUsername: strings.TrimSpace(form.TelegramUsername),
-		PaymentProof:     paymentFilename,
-		Status:           models.StatusPending,
+// generateRegistrationNumber creates a unique GH-YYYY-NNNN registration number
+func (s *ParticipantService) generateRegistrationNumber() (string, error) {
+	year := time.Now().Year()
+	prefix := fmt.Sprintf("GH-%d-", year)
+
+	var count int64
+	if err := s.db.Model(&models.Participant{}).
+		Where("registration_number LIKE ?", prefix+"%").
+		Count(&count).Error; err != nil {
+		return "", fmt.Errorf("gagal menghitung nomor registrasi: %w", err)
 	}
 
-	// Set optional job title
-	if strings.TrimSpace(form.JobTitle) != "" {
-		jt := strings.TrimSpace(form.JobTitle)
+	return fmt.Sprintf("%s%04d", prefix, count+1), nil
+}
+
+// Create registers a new participant for an event
+func (s *ParticipantService) Create(eventID uint, form *RegisterForm, paymentFilename string) (*models.Participant, error) {
+	regNumber, err := s.generateRegistrationNumber()
+	if err != nil {
+		return nil, err
+	}
+
+	participant := &models.Participant{
+		EventID:            eventID,
+		RegistrationNumber: regNumber,
+		FullName:           strings.TrimSpace(form.FullName),
+		Phone:              strings.TrimSpace(form.Phone),
+		Email:              strings.TrimSpace(strings.ToLower(form.Email)),
+		City:               strings.TrimSpace(form.City),
+		CompanyName:        strings.TrimSpace(form.CompanyName),
+		IndustrialEstate:   strings.TrimSpace(form.IndustrialEstate),
+		TelegramUsername:   strings.TrimSpace(form.TelegramUsername),
+		PaymentProof:       paymentFilename,
+		Status:             models.StatusPending,
+	}
+
+	if jt := strings.TrimSpace(form.JobTitle); jt != "" {
 		participant.JobTitle = &jt
 	}
 
 	if err := s.db.Create(participant).Error; err != nil {
-		return nil, fmt.Errorf("failed to save participant: %w", err)
+		return nil, fmt.Errorf("gagal menyimpan data peserta: %w", err)
 	}
 
 	return participant, nil
 }
 
-// GetByID returns a participant by ID
+// GetByID returns a participant by ID, preloading the associated Event
 func (s *ParticipantService) GetByID(id uint) (*models.Participant, error) {
 	var p models.Participant
 	if err := s.db.Preload("Event").First(&p, id).Error; err != nil {

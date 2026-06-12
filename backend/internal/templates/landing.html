@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{.Event.Title}} — GatherHub</title>
+  <meta name="description" content="{{.Event.Description | truncate 160}}"/>
+  <meta property="og:title" content="{{.Event.Title}}"/>
+  <meta property="og:type" content="website"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:'Plus Jakarta Sans',sans-serif;background:#07071a;color:#fff;min-height:100vh}
+    ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#0f0f2a}::-webkit-scrollbar-thumb{background:#4f46e5;border-radius:3px}
+
+    /* ── Gradient backgrounds ── */
+    .bg-hero{background:linear-gradient(135deg,#0d0d2b 0%,#1a1040 40%,#0d1635 100%)}
+    .bg-card{background:rgba(255,255,255,0.04);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08)}
+    .bg-card-solid{background:#10103a;border:1px solid rgba(255,255,255,0.1)}
+
+    /* ── Banner gradient ── */
+    .event-banner{
+      background:linear-gradient(135deg,#1e1b4b 0%,#312e81 35%,#4c1d95 65%,#1e3a5f 100%);
+      position:relative;overflow:hidden;
+    }
+    .event-banner::before{
+      content:'';position:absolute;inset:0;
+      background-image:radial-gradient(circle at 20% 50%,rgba(99,102,241,.3) 0%,transparent 50%),
+                       radial-gradient(circle at 80% 20%,rgba(139,92,246,.25) 0%,transparent 40%),
+                       radial-gradient(circle at 60% 80%,rgba(6,182,212,.15) 0%,transparent 40%);
+    }
+    .banner-grid{
+      position:absolute;inset:0;
+      background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),
+                       linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+      background-size:40px 40px;
+    }
+
+    /* ── Buttons ── */
+    .btn-cta{
+      background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);
+      box-shadow:0 8px 32px rgba(99,102,241,0.45);
+      transition:transform .25s ease,box-shadow .25s ease;
+    }
+    .btn-cta:hover{transform:translateY(-3px);box-shadow:0 14px 40px rgba(99,102,241,0.6)}
+    .btn-cta:active{transform:translateY(0)}
+    .btn-outline{
+      background:transparent;border:1.5px solid rgba(255,255,255,0.2);
+      transition:border-color .25s,background .25s;
+    }
+    .btn-outline:hover{border-color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.06)}
+
+    /* ── Info badges ── */
+    .info-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;font-size:.8rem;font-weight:600}
+    .pill-date{background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#a5b4fc}
+    .pill-loc{background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);color:#c4b5fd}
+    .pill-price{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:#6ee7b7}
+
+    /* ── Detail cards ── */
+    .detail-card{border-radius:16px;padding:20px 24px;display:flex;align-items:flex-start;gap:16px}
+    .detail-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+    /* ── Animations ── */
+    @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+    .anim-1{animation:fadeUp .6s ease both}
+    .anim-2{animation:fadeUp .6s .15s ease both}
+    .anim-3{animation:fadeUp .6s .3s ease both}
+    .anim-4{animation:fadeUp .6s .45s ease both}
+    .anim-5{animation:fadeUp .6s .6s ease both}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+    .float-anim{animation:float 5s ease-in-out infinite}
+
+    /* ── Responsive nav ── */
+    .nav-blur{background:rgba(7,7,26,.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.07)}
+  </style>
+</head>
+<body class="bg-hero">
+
+<!-- ─────────────────────── NAVBAR ─────────────────────── -->
+<nav class="nav-blur fixed top-0 inset-x-0 z-50">
+  <div class="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-2.5">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+      </div>
+      <span class="font-bold text-lg tracking-tight">GatherHub</span>
+    </a>
+    <a href="/register"
+       class="btn-cta text-sm font-semibold px-5 py-2 rounded-xl text-white">
+      Daftar Sekarang
+    </a>
+  </div>
+</nav>
+
+<!-- ─────────────────────── HERO BANNER ─────────────────────── -->
+<section class="event-banner pt-16 min-h-[65vh] flex items-end pb-0 relative">
+  <div class="banner-grid"></div>
+
+  <!-- Floating orbs for depth -->
+  <div class="absolute top-12 right-12 w-72 h-72 rounded-full bg-purple-600/20 blur-3xl float-anim pointer-events-none"></div>
+  <div class="absolute top-32 left-8 w-48 h-48 rounded-full bg-indigo-500/15 blur-3xl float-anim pointer-events-none" style="animation-delay:-2.5s"></div>
+  <div class="absolute bottom-20 right-1/3 w-40 h-40 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none"></div>
+
+  <div class="relative z-10 max-w-6xl mx-auto px-5 w-full pb-16 pt-20">
+    <!-- Category badge -->
+    <div class="anim-1 inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-xs font-semibold text-white/80 mb-6">
+      <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+      PENDAFTARAN TERBUKA
+    </div>
+
+    <!-- Title -->
+    <h1 class="anim-2 text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight max-w-3xl mb-6">
+      {{.Event.Title}}
+    </h1>
+
+    <!-- Quick info pills -->
+    <div class="anim-3 flex flex-wrap gap-3 mb-8">
+      <span class="info-pill pill-date">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        {{.Event.EventDate | formatDateLong}}
+      </span>
+      <span class="info-pill pill-loc">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        {{.Event.Location | shortLocation}}
+      </span>
+      <span class="info-pill pill-price">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        {{.Event.Price | formatPrice}}
+      </span>
+    </div>
+
+    <!-- CTA -->
+    <div class="anim-4 flex flex-wrap gap-3">
+      <a href="/register"
+         class="btn-cta inline-flex items-center gap-2.5 font-bold px-8 py-4 rounded-2xl text-base text-white">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+        </svg>
+        Daftar Sekarang
+      </a>
+      <a href="#detail"
+         class="btn-outline inline-flex items-center gap-2 font-semibold px-7 py-4 rounded-2xl text-sm text-white">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+        Lihat Detail
+      </a>
+    </div>
+  </div>
+
+  <!-- Wave separator -->
+  <div class="absolute bottom-0 inset-x-0">
+    <svg viewBox="0 0 1440 48" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" class="w-full h-12">
+      <path d="M0 48 C360 0 1080 0 1440 48 L1440 48 L0 48 Z" fill="#07071a"/>
+    </svg>
+  </div>
+</section>
+
+<!-- ─────────────────────── DETAIL SECTION ─────────────────────── -->
+<section id="detail" class="max-w-6xl mx-auto px-5 py-16">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+    <!-- Left: Description -->
+    <div class="lg:col-span-2 space-y-6">
+      <div class="anim-3">
+        <span class="text-indigo-400 text-xs font-bold uppercase tracking-widest">Tentang Acara</span>
+        <h2 class="text-2xl font-bold mt-2 mb-5">Deskripsi Kegiatan</h2>
+        <div class="bg-card rounded-2xl p-7">
+          <p class="text-white/70 leading-relaxed whitespace-pre-line text-[15px]">{{.Event.Description}}</p>
+        </div>
+      </div>
+
+      <!-- Payment Info -->
+      {{if gt .Event.Price 0.0}}
+      <div class="anim-4">
+        <span class="text-amber-400 text-xs font-bold uppercase tracking-widest">Pembayaran</span>
+        <h2 class="text-2xl font-bold mt-2 mb-5">Informasi Biaya & Transfer</h2>
+        <div class="bg-card rounded-2xl p-7 border border-amber-500/20">
+          <div class="flex items-start gap-4 mb-5">
+            <div class="detail-icon" style="background:rgba(245,158,11,.15)">
+              <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-xs text-white/40 uppercase tracking-widest font-semibold mb-1">Transfer ke rekening berikut</p>
+              <p class="text-white font-bold text-lg">{{.Event.PaymentBank}}</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="bg-white/5 rounded-xl p-4">
+              <p class="text-xs text-white/40 mb-1.5 font-medium">No. Rekening</p>
+              <p class="text-white font-bold font-mono text-lg tracking-wider">{{.Event.PaymentAccountNumber}}</p>
+            </div>
+            <div class="bg-white/5 rounded-xl p-4">
+              <p class="text-xs text-white/40 mb-1.5 font-medium">Atas Nama</p>
+              <p class="text-white font-bold">{{.Event.PaymentAccountName}}</p>
+            </div>
+            <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+              <p class="text-xs text-amber-400/70 mb-1.5 font-medium">Biaya Pendaftaran</p>
+              <p class="text-amber-300 font-extrabold text-xl">{{.Event.Price | formatPrice}}</p>
+            </div>
+          </div>
+          <p class="text-white/40 text-xs mt-4 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Simpan bukti transfer dan unggah saat mengisi formulir pendaftaran.
+          </p>
+        </div>
+      </div>
+      {{end}}
+    </div>
+
+    <!-- Right: Info Sidebar -->
+    <div class="space-y-5 anim-5">
+      <!-- Date & Time Card -->
+      <div class="bg-card-solid detail-card">
+        <div class="detail-icon" style="background:rgba(99,102,241,.2)">
+          <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-xs text-white/40 uppercase tracking-widest font-semibold mb-1">Tanggal & Waktu</p>
+          <p class="text-white font-bold leading-snug">{{.Event.EventDate | formatDateLong}}</p>
+          <p class="text-indigo-300 text-sm font-medium mt-0.5">{{.Event.EventDate | formatTime}}</p>
+        </div>
+      </div>
+
+      <!-- Location Card -->
+      <div class="bg-card-solid detail-card">
+        <div class="detail-icon" style="background:rgba(139,92,246,.2)">
+          <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-xs text-white/40 uppercase tracking-widest font-semibold mb-1">Lokasi</p>
+          <p class="text-white font-bold leading-snug">{{.Event.Location}}</p>
+        </div>
+      </div>
+
+      <!-- Price Card -->
+      <div class="bg-card-solid detail-card">
+        <div class="detail-icon" style="background:rgba(16,185,129,.2)">
+          <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-xs text-white/40 uppercase tracking-widest font-semibold mb-1">Biaya Pendaftaran</p>
+          <p class="text-emerald-300 font-extrabold text-xl">{{.Event.Price | formatPrice}}</p>
+          {{if gt .Event.Price 0.0}}
+          <p class="text-white/40 text-xs mt-0.5">Termasuk semua sesi & materi</p>
+          {{else}}
+          <p class="text-white/40 text-xs mt-0.5">Tidak ada biaya pendaftaran</p>
+          {{end}}
+        </div>
+      </div>
+
+      <!-- Admin Contact Card -->
+      <div class="bg-card-solid detail-card">
+        <div class="detail-icon" style="background:rgba(52,211,153,.15)">
+          <svg class="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <p class="text-xs text-white/40 uppercase tracking-widest font-semibold mb-1">Kontak Panitia</p>
+          <p class="text-white font-bold truncate">{{.Event.AdminName}}</p>
+          <a href="https://wa.me/{{.Event.AdminWhatsapp}}" target="_blank"
+             class="text-emerald-400 text-sm hover:text-emerald-300 transition-colors font-medium">
+            +{{.Event.AdminWhatsapp}}
+          </a>
+        </div>
+      </div>
+
+      <!-- Big Register CTA -->
+      <a href="/register"
+         class="btn-cta flex items-center justify-center gap-2 font-bold py-4 rounded-2xl text-base text-white text-center w-full">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+        </svg>
+        Daftar Sekarang
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────── FOOTER ─────────────────────── -->
+<footer class="border-t border-white/8 py-10 mt-8">
+  <div class="max-w-6xl mx-auto px-5 flex flex-col md:flex-row items-center justify-between gap-4">
+    <div class="flex items-center gap-2.5">
+      <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+        <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+      </div>
+      <span class="font-bold text-white">GatherHub</span>
+    </div>
+    <p class="text-white/30 text-sm">© {{now | formatYear}} GatherHub · Platform Registrasi Acara Modern</p>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -18,7 +18,7 @@ func main() {
 	// Load configuration
 	cfg := config.Load()
 
-	// Ensure upload directories exist
+	// Ensure storage directories exist
 	for _, dir := range []string{cfg.UploadDir, cfg.PaymentUploadDir} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			log.Printf("Warning: could not create directory %s: %v", dir, err)
@@ -36,7 +36,7 @@ func main() {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
-	// Seed sample event if empty
+	// Seed sample event if the events table is empty
 	eventService := services.NewEventService(db)
 	if err := eventService.SeedSampleIfEmpty(); err != nil {
 		log.Printf("Warning: could not seed sample event: %v", err)
@@ -44,8 +44,8 @@ func main() {
 
 	// Initialize Fiber app
 	app := fiber.New(fiber.Config{
-		AppName:     "GatherHub API v1.0",
-		BodyLimit:   10 * 1024 * 1024, // 10MB for payment proof uploads
+		AppName:     "GatherHub v1.0",
+		BodyLimit:   11 * 1024 * 1024, // 11 MB — accommodates 10 MB file + form fields
 		ProxyHeader: fiber.HeaderXForwardedFor,
 	})
 
@@ -56,34 +56,22 @@ func main() {
 	}))
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization, HX-Request, HX-Current-URL, HX-Target",
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization, HX-Request, HX-Current-URL, HX-Target, HX-Trigger",
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
 
-	// Serve static frontend files (for local development)
-	if cfg.FrontendDir != "" {
-		if _, err := os.Stat(cfg.FrontendDir); err == nil {
-			app.Static("/", cfg.FrontendDir, fiber.Static{
-				Index:    "index.html",
-				Browse:   false,
-				MaxAge:   3600,
-				Compress: true,
-			})
-			log.Printf("Serving frontend from: %s", cfg.FrontendDir)
-		} else {
-			log.Printf("Frontend directory not found at %s, skipping static serving", cfg.FrontendDir)
-		}
-	}
+	// Serve uploaded payment proofs at /payments/*
+	app.Static("/payments", cfg.PaymentUploadDir, fiber.Static{
+		MaxAge:   86400,
+		Compress: false,
+	})
 
-	// Serve uploaded payment proofs
-	app.Static("/payments", cfg.PaymentUploadDir)
-
-	// Register API and fragment routes
+	// Register all page and API routes
 	routes.Register(app, db, cfg.PaymentUploadDir)
 
 	// Start server
 	addr := ":" + cfg.AppPort
-	log.Printf("✓ GatherHub server listening on http://localhost%s", addr)
+	log.Printf("✓ GatherHub running on http://localhost%s", addr)
 	if err := app.Listen(addr); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
