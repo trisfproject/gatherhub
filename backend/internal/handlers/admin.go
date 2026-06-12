@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gatherhub/backend/internal/models"
-	"github.com/gatherhub/backend/internal/services"
-	templ "github.com/gatherhub/backend/internal/templates"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/session"
+	"github.com/trisfproject/gatherhub/internal/models"
+	"github.com/trisfproject/gatherhub/internal/services"
+	templ "github.com/trisfproject/gatherhub/internal/templates"
 	"github.com/xuri/excelize/v2"
 	"golang.org/x/crypto/bcrypt"
 )

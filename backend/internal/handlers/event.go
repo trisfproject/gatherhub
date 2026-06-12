@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gatherhub/backend/internal/models"
-	"github.com/gatherhub/backend/internal/services"
 	"github.com/gofiber/fiber/v2"
+	"github.com/trisfproject/gatherhub/internal/models"
+	"github.com/trisfproject/gatherhub/internal/services"
 )
 
 // EventHandler handles HTTP requests for events

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/gatherhub/backend/internal/models"
+	"github.com/trisfproject/gatherhub/internal/models"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )

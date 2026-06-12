@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gatherhub/backend/internal/models"
+	"github.com/trisfproject/gatherhub/internal/models"
 	"gorm.io/gorm"
 )
 

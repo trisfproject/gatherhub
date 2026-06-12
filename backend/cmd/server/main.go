@@ -4,15 +4,15 @@ import (
 	"log"
 	"time"
 
-	"github.com/gatherhub/backend/internal/config"
-	"github.com/gatherhub/backend/internal/database"
-	"github.com/gatherhub/backend/internal/routes"
-	"github.com/gatherhub/backend/internal/services"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/session"
+	"github.com/trisfproject/gatherhub/internal/config"
+	"github.com/trisfproject/gatherhub/internal/database"
+	"github.com/trisfproject/gatherhub/internal/routes"
+	"github.com/trisfproject/gatherhub/internal/services"
 )
 
 func main() {

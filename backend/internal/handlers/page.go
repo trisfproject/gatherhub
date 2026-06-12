@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gatherhub/backend/internal/models"
-	"github.com/gatherhub/backend/internal/services"
-	templ "github.com/gatherhub/backend/internal/templates"
 	"github.com/gofiber/fiber/v2"
+	"github.com/trisfproject/gatherhub/internal/models"
+	"github.com/trisfproject/gatherhub/internal/services"
+	templ "github.com/trisfproject/gatherhub/internal/templates"
 )
 
 // ─────────────────────── Data Structs ───────────────────────

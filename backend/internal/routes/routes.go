@@ -3,11 +3,11 @@ package routes
 import (
 	"log"
 
-	"github.com/gatherhub/backend/internal/handlers"
-	"github.com/gatherhub/backend/internal/middleware"
-	"github.com/gatherhub/backend/internal/services"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/session"
+	"github.com/trisfproject/gatherhub/internal/handlers"
+	"github.com/trisfproject/gatherhub/internal/middleware"
+	"github.com/trisfproject/gatherhub/internal/services"
 	"gorm.io/gorm"
 )
 

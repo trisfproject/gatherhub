@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/gatherhub/backend/internal/config"
-	"github.com/gatherhub/backend/internal/models"
+	"github.com/trisfproject/gatherhub/internal/config"
+	"github.com/trisfproject/gatherhub/internal/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
