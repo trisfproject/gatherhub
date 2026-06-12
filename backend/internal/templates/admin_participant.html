@@ -170,25 +170,6 @@
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                   Tolak
                 </button>
-                {{else if isEq $status "VERIFIED"}}
-                <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'REJECTED', 'Apakah Anda yakin ingin menolak pendaftaran {{$name}}?', 'REJECTED')"
-                  class="flex-1 flex items-center justify-center gap-2 bg-red-700 hover:bg-red-600 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
-                  Ubah ke Ditolak
-                </button>
-                <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'PENDING', 'Apakah Anda yakin ingin mengembalikan pendaftaran {{$name}} ke status Pending?', 'PENDING')"
-                  class="flex-1 flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
-                  Kembalikan ke Pending
-                </button>
-                {{else}}
-                <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'VERIFIED', 'Apakah Anda yakin ingin memverifikasi pendaftaran {{$name}}?', 'VERIFIED')"
-                  class="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                  Verifikasi
-                </button>
-                <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'PENDING', 'Apakah Anda yakin ingin mengembalikan pendaftaran {{$name}} ke status Pending?', 'PENDING')"
-                  class="flex-1 flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
-                  Kembalikan ke Pending
-                </button>
                 {{end}}
               </div>
             </div>
@@ -209,7 +190,26 @@
         </div>
 
         <!-- Personal Info Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <!-- Registration Info -->
+          <div class="glass p-6 fade-up">
+            <p class="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-4">Informasi Pendaftaran</p>
+            <div>
+              <div class="info-row">
+                <span class="info-label">Nomor Registrasi</span>
+                <span class="info-value font-mono text-sm">{{.Participant.RegistrationNumber}}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Tanggal Registrasi</span>
+                <span class="info-value">{{.Participant.CreatedAt | formatDateTime}}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Acara / Event</span>
+                <span class="info-value">{{if .Event}}{{.Event.Title}}{{else}}–{{end}}</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Contact -->
           <div class="glass p-6 fade-up">
             <p class="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-4">Informasi Kontak</p>

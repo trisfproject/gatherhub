@@ -1225,27 +1225,9 @@ func buildStatusFragment(p *models.Participant) string {
   Tolak
 </button>`, p.ID, p.FullName, p.ID, p.FullName)
 	case models.StatusVerified:
-		actions = fmt.Sprintf(`
-<button onclick="confirmAction('/admin/participants/%d/status', 'REJECTED', 'Apakah Anda yakin ingin menolak pendaftaran %s?', 'REJECTED')"
-  class="flex-1 flex items-center justify-center gap-2 bg-red-700 hover:bg-red-600 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
-  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-  Ubah ke Ditolak
-</button>
-<button onclick="confirmAction('/admin/participants/%d/status', 'PENDING', 'Apakah Anda yakin ingin mengembalikan pendaftaran %s ke status Pending?', 'PENDING')"
-  class="flex-1 flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
-  Kembalikan ke Pending
-</button>`, p.ID, p.FullName, p.ID, p.FullName)
+		actions = ""
 	case models.StatusRejected:
-		actions = fmt.Sprintf(`
-<button onclick="confirmAction('/admin/participants/%d/status', 'VERIFIED', 'Apakah Anda yakin ingin memverifikasi pendaftaran %s?', 'VERIFIED')"
-  class="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
-  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-  Verifikasi
-</button>
-<button onclick="confirmAction('/admin/participants/%d/status', 'PENDING', 'Apakah Anda yakin ingin mengembalikan pendaftaran %s ke status Pending?', 'PENDING')"
-  class="flex-1 flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
-  Kembalikan ke Pending
-</button>`, p.ID, p.FullName, p.ID, p.FullName)
+		actions = ""
 	}
 
 	historyHTML := ""

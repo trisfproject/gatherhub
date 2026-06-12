@@ -269,10 +269,9 @@ func (s *ParticipantService) UpdateStatus(id uint, status models.ParticipantStat
 	allowed := map[models.ParticipantStatus]bool{
 		models.StatusVerified: true,
 		models.StatusRejected: true,
-		models.StatusPending:  true,
 	}
 	if !allowed[status] {
-		return nil, fmt.Errorf("invalid status: %s", status)
+		return nil, fmt.Errorf("status target tidak valid: %s", status)
 	}
 
 	var p models.Participant
@@ -283,6 +282,11 @@ func (s *ParticipantService) UpdateStatus(id uint, status models.ParticipantStat
 		return nil, err
 	}
 
+	// Enforce rules: PENDING -> VERIFIED, PENDING -> REJECTED
+	if p.Status != models.StatusPending {
+		return nil, fmt.Errorf("hanya peserta dengan status PENDING yang dapat diubah statusnya (status saat ini: %s)", p.Status)
+	}
+
 	p.Status = status
 	now := time.Now()
 	if status == models.StatusVerified {
@@ -291,9 +295,6 @@ func (s *ParticipantService) UpdateStatus(id uint, status models.ParticipantStat
 	} else if status == models.StatusRejected {
 		p.RejectedAt = &now
 		p.VerifiedAt = nil
-	} else if status == models.StatusPending {
-		p.VerifiedAt = nil
-		p.RejectedAt = nil
 	}
 
 	if err := s.db.Save(&p).Error; err != nil {
