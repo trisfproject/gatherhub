@@ -48,6 +48,14 @@ type ParticipantPage struct {
 	IsCurrent bool
 }
 
+type AdminNotificationsData struct {
+	AdminUser string
+	AdminRole string
+	Logs      []models.NotificationLog
+	Stats     *services.ParticipantStats
+	Event     *models.Event
+}
+
 type AdminParticipantsData struct {
 	AdminUser      string
 	AdminRole      string
@@ -157,12 +165,13 @@ type AdminSettingsData struct {
 
 // AdminHandler handles all admin panel routes
 type AdminHandler struct {
-	participantService *services.ParticipantService
-	eventService       *services.EventService
-	store              *session.Store
-	adminService       *services.AdminService
-	storageService     *services.StorageService
-	tmpl               *template.Template
+	participantService  *services.ParticipantService
+	eventService        *services.EventService
+	store               *session.Store
+	adminService        *services.AdminService
+	storageService      *services.StorageService
+	notificationService *services.NotificationService
+	tmpl                *template.Template
 }
 
 // NewAdminHandler creates and initialises an AdminHandler
@@ -172,6 +181,7 @@ func NewAdminHandler(
 	store *session.Store,
 	adminService *services.AdminService,
 	storageService *services.StorageService,
+	notificationService *services.NotificationService,
 ) (*AdminHandler, error) {
 	funcMap := buildAdminFuncMap()
 	t, err := template.New("").Funcs(funcMap).ParseFS(
@@ -188,17 +198,19 @@ func NewAdminHandler(
 		"admin_admin_create.html",
 		"admin_admin_edit.html",
 		"admin_settings.html",
+		"admin_notifications.html",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse admin templates: %w", err)
 	}
 	return &AdminHandler{
-		participantService: participantService,
-		eventService:       eventService,
-		store:              store,
-		adminService:       adminService,
-		storageService:     storageService,
-		tmpl:               t,
+		participantService:  participantService,
+		eventService:        eventService,
+		store:               store,
+		adminService:        adminService,
+		storageService:      storageService,
+		notificationService: notificationService,
+		tmpl:                t,
 	}, nil
 }
 
@@ -471,6 +483,11 @@ func (h *AdminHandler) UpdateStatus(c *fiber.Ctx) error {
 				`<div class="text-red-400 text-sm font-semibold">Gagal memperbarui status.</div>`)
 		}
 		return c.Redirect(fmt.Sprintf("/admin/participants/%d", id), fiber.StatusSeeOther)
+	}
+
+	// Trigger verified/rejected notification
+	if err := h.notificationService.SendNotification(p, string(status)); err != nil {
+		log.Printf("Warning: failed to send status update notification: %v", err)
 	}
 
 	// HTMX: return updated status badge + action buttons fragment
@@ -1757,3 +1774,25 @@ func buildAdminFuncMap() template.FuncMap {
 		},
 	}
 }
+
+// NotificationList handles GET /admin/notifications
+func (h *AdminHandler) NotificationList(c *fiber.Ctx) error {
+	logs, err := h.notificationService.GetAllLogs()
+	if err != nil {
+		logs = []models.NotificationLog{}
+	}
+
+	stats, _ := h.participantService.GetStats()
+	event, _ := h.eventService.GetFirst()
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	return h.render(c, "admin_notifications.html", AdminNotificationsData{
+		AdminUser: adminUser,
+		AdminRole: adminRole,
+		Logs:      logs,
+		Stats:     stats,
+		Event:     event,
+	})
+}
+

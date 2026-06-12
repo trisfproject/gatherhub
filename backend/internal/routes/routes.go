@@ -17,6 +17,7 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	// ── Services ──────────────────────────────────────────────
 	eventService := services.NewEventService(db)
 	participantService := services.NewParticipantService(db, storageService)
+	notificationService := services.NewNotificationService(db)
 
 	adminService := services.NewAdminService(db)
 	if err := adminService.SeedDefaultAdmin(); err != nil {
@@ -26,12 +27,12 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	// ── Handlers ──────────────────────────────────────────────
 	healthHandler := handlers.NewHealthHandler(db)
 
-	pageHandler, err := handlers.NewPageHandler(eventService, participantService)
+	pageHandler, err := handlers.NewPageHandler(eventService, participantService, notificationService)
 	if err != nil {
 		log.Fatalf("Failed to initialise page handler: %v", err)
 	}
 
-	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storageService)
+	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storageService, notificationService)
 	if err != nil {
 		log.Fatalf("Failed to initialise admin handler: %v", err)
 	}
@@ -69,6 +70,7 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	admin.Get("/participants/export", adminHandler.ExportParticipants)
 	admin.Get("/participants/:id", adminHandler.ParticipantDetail)
 	admin.Post("/participants/:id/status", adminHandler.UpdateStatus)
+	admin.Get("/notifications", adminHandler.NotificationList)
 
 	// Event management routes
 	admin.Get("/events", adminHandler.EventList)

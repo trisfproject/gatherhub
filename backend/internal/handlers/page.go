@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -44,15 +45,17 @@ type SuccessData struct {
 
 // PageHandler renders server-side HTML pages for the public registration flow
 type PageHandler struct {
-	eventService       *services.EventService
-	participantService *services.ParticipantService
-	tmpl               *template.Template
+	eventService        *services.EventService
+	participantService  *services.ParticipantService
+	notificationService *services.NotificationService
+	tmpl                *template.Template
 }
 
 // NewPageHandler creates and initialises a PageHandler, parsing all embedded templates.
 func NewPageHandler(
 	eventService *services.EventService,
 	participantService *services.ParticipantService,
+	notificationService *services.NotificationService,
 ) (*PageHandler, error) {
 	funcMap := buildFuncMap()
 	t, err := template.New("").Funcs(funcMap).ParseFS(templ.Files, "landing.html", "register.html", "success.html", "event_public.html")
@@ -60,9 +63,10 @@ func NewPageHandler(
 		return nil, fmt.Errorf("failed to parse templates: %w", err)
 	}
 	return &PageHandler{
-		eventService:       eventService,
-		participantService: participantService,
-		tmpl:               t,
+		eventService:        eventService,
+		participantService:  participantService,
+		notificationService: notificationService,
+		tmpl:                t,
 	}, nil
 }
 
@@ -153,6 +157,12 @@ func (h *PageHandler) RegisterSubmit(c *fiber.Ctx) error {
 	participant, err := h.participantService.Create(event.ID, form, paymentFilename)
 	if err != nil {
 		return h.handleValidationError(c, event, form, []string{"Gagal menyimpan data: " + err.Error()})
+	}
+
+	// Trigger registration submitted notification
+	participant.Event = *event
+	if err := h.notificationService.SendNotification(participant, "SUBMITTED"); err != nil {
+		log.Printf("Warning: failed to send registration submitted notification: %v", err)
 	}
 
 	// Success — redirect to success page
