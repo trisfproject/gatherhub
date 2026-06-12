@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -41,22 +42,36 @@ type AdminDashboardData struct {
 	AnalyticsJSON       string
 }
 
+type ParticipantPage struct {
+	Num       int
+	URL       string
+	IsCurrent bool
+}
+
 type AdminParticipantsData struct {
-	AdminUser    string
-	AdminRole    string
-	Participants []models.Participant
-	Stats        *services.ParticipantStats
-	Filter       string
-	Search       string
-	Event        *models.Event
-	Page         int
-	TotalPages   int
-	TotalItems   int64
-	HasPrev      bool
-	HasNext      bool
-	PrevPage     int
-	NextPage     int
-	Pages        []int
+	AdminUser      string
+	AdminRole      string
+	Participants   []models.Participant
+	Stats          *services.ParticipantStats
+	Filter         string
+	Search         string
+	Event          *models.Event
+	Page           int
+	TotalPages     int
+	TotalItems     int64
+	HasPrev        bool
+	HasNext        bool
+	PrevPage       int
+	NextPage       int
+	Pages          []int
+	PageItems      []ParticipantPage
+	ExportURL      string
+	TabAllURL      string
+	TabPendingURL  string
+	TabVerifiedURL string
+	TabRejectedURL string
+	PagePrevURL    string
+	PageNextURL    string
 }
 
 type AdminParticipantDetailData struct {
@@ -302,6 +317,41 @@ func (h *AdminHandler) Dashboard(c *fiber.Ctx) error {
 	})
 }
 
+// Helper to build a query string for participants list URL
+func buildParticipantsURL(page int, status, search string) string {
+	var params []string
+	if page > 1 {
+		params = append(params, fmt.Sprintf("page=%d", page))
+	}
+	if status != "" {
+		params = append(params, "status="+url.QueryEscape(status))
+	}
+	if search != "" {
+		params = append(params, "q="+url.QueryEscape(search))
+	}
+
+	if len(params) > 0 {
+		return "/admin/participants?" + strings.Join(params, "&")
+	}
+	return "/admin/participants"
+}
+
+// Helper to build a query string for export URL
+func buildExportURL(status, search string) string {
+	var params []string
+	if status != "" {
+		params = append(params, "status="+url.QueryEscape(status))
+	}
+	if search != "" {
+		params = append(params, "q="+url.QueryEscape(search))
+	}
+
+	if len(params) > 0 {
+		return "/admin/participants/export?" + strings.Join(params, "&")
+	}
+	return "/admin/participants/export"
+}
+
 // ParticipantList handles GET /admin/participants
 func (h *AdminHandler) ParticipantList(c *fiber.Ctx) error {
 	filter := c.Query("status")
@@ -329,8 +379,14 @@ func (h *AdminHandler) ParticipantList(c *fiber.Ctx) error {
 	nextPage := page + 1
 
 	var pages []int
+	var pageItems []ParticipantPage
 	for i := 1; i <= totalPages; i++ {
 		pages = append(pages, i)
+		pageItems = append(pageItems, ParticipantPage{
+			Num:       i,
+			URL:       buildParticipantsURL(i, filter, search),
+			IsCurrent: i == page,
+		})
 	}
 
 	stats, _ := h.participantService.GetStats()
@@ -339,21 +395,29 @@ func (h *AdminHandler) ParticipantList(c *fiber.Ctx) error {
 	adminRole, _ := c.Locals("admin_role").(string)
 
 	return h.render(c, "admin_participants.html", AdminParticipantsData{
-		AdminUser:    adminUser,
-		AdminRole:    adminRole,
-		Participants: participants,
-		Stats:        stats,
-		Filter:       filter,
-		Search:       search,
-		Event:        event,
-		Page:         page,
-		TotalPages:   totalPages,
-		TotalItems:   totalItems,
-		HasPrev:      hasPrev,
-		HasNext:      hasNext,
-		PrevPage:     prevPage,
-		NextPage:     nextPage,
-		Pages:        pages,
+		AdminUser:      adminUser,
+		AdminRole:      adminRole,
+		Participants:   participants,
+		Stats:          stats,
+		Filter:         filter,
+		Search:         search,
+		Event:          event,
+		Page:           page,
+		TotalPages:     totalPages,
+		TotalItems:     totalItems,
+		HasPrev:        hasPrev,
+		HasNext:        hasNext,
+		PrevPage:       prevPage,
+		NextPage:       nextPage,
+		Pages:          pages,
+		PageItems:      pageItems,
+		ExportURL:      buildExportURL(filter, search),
+		TabAllURL:      buildParticipantsURL(1, "", search),
+		TabPendingURL:  buildParticipantsURL(1, "PENDING", search),
+		TabVerifiedURL: buildParticipantsURL(1, "VERIFIED", search),
+		TabRejectedURL: buildParticipantsURL(1, "REJECTED", search),
+		PagePrevURL:    buildParticipantsURL(prevPage, filter, search),
+		PageNextURL:    buildParticipantsURL(nextPage, filter, search),
 	})
 }
 

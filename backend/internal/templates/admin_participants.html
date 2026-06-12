@@ -136,7 +136,7 @@
       </div>
       <!-- Export Excel Button -->
       <a id="btn-export"
-         href="/admin/participants/export{{if or .Filter .Search}}?{{end}}{{if .Filter}}status={{.Filter}}{{end}}{{if and .Filter .Search}}&{{end}}{{if .Search}}q={{.Search}}{{end}}"
+         href="{{.ExportURL}}"
          title="Export ke Excel"
          class="flex items-center gap-2 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 font-semibold py-1.5 px-3 rounded-xl text-sm transition-colors">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -155,19 +155,19 @@
 
         <!-- Status Filter Tabs -->
         <div class="flex flex-wrap gap-2">
-          <a href="/admin/participants"
+          <a href="{{.TabAllURL}}"
              class="filter-tab text-white/50 {{if isEq .Filter ""}}active{{end}}">
             Semua <span class="text-white/30 ml-1">{{.Stats.Total}}</span>
           </a>
-          <a href="/admin/participants?status=PENDING{{if .Search}}&q={{.Search}}{{end}}"
+          <a href="{{.TabPendingURL}}"
              class="filter-tab text-white/50 {{if isEq .Filter "PENDING"}}active-pending{{end}}">
             Menunggu <span class="ml-1 opacity-60">{{.Stats.Pending}}</span>
           </a>
-          <a href="/admin/participants?status=VERIFIED{{if .Search}}&q={{.Search}}{{end}}"
+          <a href="{{.TabVerifiedURL}}"
              class="filter-tab text-white/50 {{if isEq .Filter "VERIFIED"}}active-verified{{end}}">
             Terverifikasi <span class="ml-1 opacity-60">{{.Stats.Verified}}</span>
           </a>
-          <a href="/admin/participants?status=REJECTED{{if .Search}}&q={{.Search}}{{end}}"
+          <a href="{{.TabRejectedURL}}"
              class="filter-tab text-white/50 {{if isEq .Filter "REJECTED"}}active-rejected{{end}}">
             Ditolak <span class="ml-1 opacity-60">{{.Stats.Rejected}}</span>
           </a>
@@ -260,7 +260,7 @@
         <div class="flex items-center gap-1.5">
           <!-- Previous Button -->
           {{if .HasPrev}}
-          <a href="/admin/participants?page={{.PrevPage}}{{if .Filter}}&status={{.Filter}}{{end}}{{if .Search}}&q={{.Search}}{{end}}"
+          <a href="{{.PagePrevURL}}"
              class="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/8 transition-all">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
           </a>
@@ -271,19 +271,16 @@
           {{end}}
 
           <!-- Pages Buttons -->
-          {{$currPage := .Page}}
-          {{$filter := .Filter}}
-          {{$search := .Search}}
-          {{range .Pages}}
-          <a href="/admin/participants?page={{.}}{{if $filter}}&status={{$filter}}{{end}}{{if $search}}&q={{$search}}{{end}}"
-             class="flex items-center justify-center w-8 h-8 rounded-lg border transition-all {{if eq . $currPage}}bg-indigo-600/25 border-indigo-500/50 text-indigo-300 font-bold{{else}}bg-white/5 border-white/8 text-white/60 hover:bg-white/10 hover:text-white{{end}}">
-            {{.}}
+          {{range .PageItems}}
+          <a href="{{.URL}}"
+             class="flex items-center justify-center w-8 h-8 rounded-lg border transition-all {{if .IsCurrent}}bg-indigo-600/25 border-indigo-500/50 text-indigo-300 font-bold{{else}}bg-white/5 border-white/8 text-white/60 hover:bg-white/10 hover:text-white{{end}}">
+            {{.Num}}
           </a>
           {{end}}
 
           <!-- Next Button -->
           {{if .HasNext}}
-          <a href="/admin/participants?page={{.NextPage}}{{if .Filter}}&status={{.Filter}}{{end}}{{if .Search}}&q={{.Search}}{{end}}"
+          <a href="{{.PageNextURL}}"
              class="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/8 transition-all">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
           </a>
