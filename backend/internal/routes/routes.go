@@ -15,9 +15,10 @@ import (
 // storage holds the resolved paths for all upload directories.
 func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageService, adminUsername, adminPassword string, store *session.Store) {
 	// ── Services ──────────────────────────────────────────────
+	auditLogService := services.NewAuditLogService(db)
 	eventService := services.NewEventService(db)
 	participantService := services.NewParticipantService(db, storageService)
-	notificationService := services.NewNotificationService(db)
+	notificationService := services.NewNotificationService(db, auditLogService)
 
 	adminService := services.NewAdminService(db)
 	if err := adminService.SeedDefaultAdmin(); err != nil {
@@ -32,7 +33,7 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 		log.Fatalf("Failed to initialise page handler: %v", err)
 	}
 
-	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storageService, notificationService)
+	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storageService, notificationService, auditLogService)
 	if err != nil {
 		log.Fatalf("Failed to initialise admin handler: %v", err)
 	}
@@ -71,6 +72,7 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	admin.Get("/participants/:id", adminHandler.ParticipantDetail)
 	admin.Post("/participants/:id/status", adminHandler.UpdateStatus)
 	admin.Get("/notifications", adminHandler.NotificationList)
+	admin.Get("/audit-logs", adminHandler.AuditLogList)
 
 	// Event management routes
 	admin.Get("/events", adminHandler.EventList)

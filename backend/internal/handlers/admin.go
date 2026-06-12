@@ -171,6 +171,7 @@ type AdminHandler struct {
 	adminService        *services.AdminService
 	storageService      *services.StorageService
 	notificationService *services.NotificationService
+	auditLogService     *services.AuditLogService
 	tmpl                *template.Template
 }
 
@@ -182,6 +183,7 @@ func NewAdminHandler(
 	adminService *services.AdminService,
 	storageService *services.StorageService,
 	notificationService *services.NotificationService,
+	auditLogService *services.AuditLogService,
 ) (*AdminHandler, error) {
 	funcMap := buildAdminFuncMap()
 	t, err := template.New("").Funcs(funcMap).ParseFS(
@@ -199,6 +201,7 @@ func NewAdminHandler(
 		"admin_admin_edit.html",
 		"admin_settings.html",
 		"admin_notifications.html",
+		"admin_audit_logs.html",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse admin templates: %w", err)
@@ -210,6 +213,7 @@ func NewAdminHandler(
 		adminService:        adminService,
 		storageService:      storageService,
 		notificationService: notificationService,
+		auditLogService:     auditLogService,
 		tmpl:                t,
 	}, nil
 }
@@ -476,6 +480,14 @@ func (h *AdminHandler) UpdateStatus(c *fiber.Ctx) error {
 	rawStatus := strings.ToUpper(strings.TrimSpace(c.FormValue("status")))
 	status := models.ParticipantStatus(rawStatus)
 
+	oldP, getErr := h.participantService.GetByID(uint(id))
+	var oldPJSON string
+	if getErr == nil && oldP != nil {
+		if bytes, err := json.Marshal(oldP); err == nil {
+			oldPJSON = string(bytes)
+		}
+	}
+
 	p, err := h.participantService.UpdateStatus(uint(id), status)
 	if err != nil {
 		if c.Get("HX-Request") == "true" {
@@ -483,6 +495,17 @@ func (h *AdminHandler) UpdateStatus(c *fiber.Ctx) error {
 				`<div class="text-red-400 text-sm font-semibold">Gagal memperbarui status.</div>`)
 		}
 		return c.Redirect(fmt.Sprintf("/admin/participants/%d", id), fiber.StatusSeeOther)
+	}
+
+	action := "UPDATE"
+	if status == "VERIFIED" {
+		action = "VERIFY"
+	} else if status == "REJECTED" {
+		action = "REJECT"
+	}
+	adminUser, _ := c.Locals("admin_username").(string)
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, action, "PARTICIPANT", p.ID, oldPJSON, p, c.IP(), c.Get("User-Agent"))
 	}
 
 	// Trigger verified/rejected notification
@@ -857,6 +880,10 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 		})
 	}
 
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, "CREATE", "EVENT", newEvent.ID, nil, newEvent, c.IP(), c.Get("User-Agent"))
+	}
+
 	setFlash(c, "success", "Acara \""+title+"\" berhasil dibuat.")
 	return c.Redirect("/admin/events", fiber.StatusSeeOther)
 }
@@ -920,6 +947,11 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 	event, err := h.eventService.GetByID(uint(id))
 	if err != nil {
 		return c.Redirect("/admin/events", fiber.StatusSeeOther)
+	}
+
+	oldEventJSON := ""
+	if bytes, err := json.Marshal(event); err == nil {
+		oldEventJSON = string(bytes)
 	}
 
 	adminUser, _ := c.Locals("admin_username").(string)
@@ -1099,6 +1131,10 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 		})
 	}
 
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, "UPDATE", "EVENT", event.ID, oldEventJSON, event, c.IP(), c.Get("User-Agent"))
+	}
+
 	setFlash(c, "success", "Acara \""+title+"\" berhasil diperbarui.")
 	return c.Redirect("/admin/events", fiber.StatusSeeOther)
 }
@@ -1110,6 +1146,14 @@ func (h *AdminHandler) EventDelete(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ID"})
 	}
 
+	event, getErr := h.eventService.GetByID(uint(id))
+	var oldEventJSON string
+	if getErr == nil && event != nil {
+		if bytes, err := json.Marshal(event); err == nil {
+			oldEventJSON = string(bytes)
+		}
+	}
+
 	if err := h.eventService.Delete(uint(id)); err != nil {
 		setFlash(c, "error", "Gagal menghapus acara: "+err.Error())
 		if c.Get("HX-Request") == "true" {
@@ -1117,6 +1161,11 @@ func (h *AdminHandler) EventDelete(c *fiber.Ctx) error {
 			return c.SendStatus(fiber.StatusOK)
 		}
 		return c.Redirect("/admin/events", fiber.StatusSeeOther)
+	}
+
+	adminUser, _ := c.Locals("admin_username").(string)
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, "DELETE", "EVENT", uint(id), oldEventJSON, nil, c.IP(), c.Get("User-Agent"))
 	}
 
 	setFlash(c, "success", "Acara berhasil dihapus.")
@@ -1171,10 +1220,26 @@ func (h *AdminHandler) EventUpdateStatus(c *fiber.Ctx) error {
 		return c.Redirect("/admin/events", fiber.StatusSeeOther)
 	}
 
+	oldEventJSON := ""
+	if bytes, err := json.Marshal(event); err == nil {
+		oldEventJSON = string(bytes)
+	}
+
 	event.Status = status
 	if err := h.eventService.Update(event); err != nil {
 		setFlash(c, "error", "Gagal memperbarui status acara.")
 		return c.Redirect(fmt.Sprintf("/admin/events/%d", id), fiber.StatusSeeOther)
+	}
+
+	adminUser, _ := c.Locals("admin_username").(string)
+	action := "UPDATE"
+	if status == "PUBLISHED" {
+		action = "PUBLISH"
+	} else if status == "CLOSED" {
+		action = "CLOSE"
+	}
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, action, "EVENT", event.ID, oldEventJSON, event, c.IP(), c.Get("User-Agent"))
 	}
 
 	statusLabels := map[string]string{
@@ -1796,3 +1861,44 @@ func (h *AdminHandler) NotificationList(c *fiber.Ctx) error {
 	})
 }
 
+type AdminAuditLogsData struct {
+	AdminUser      string
+	AdminRole      string
+	Logs           []models.AuditLog
+	Stats          *services.ParticipantStats
+	Search         string
+	FilterResource string
+	FilterAction   string
+	StartDate      string
+	EndDate        string
+}
+
+// AuditLogList handles GET /admin/audit-logs
+func (h *AdminHandler) AuditLogList(c *fiber.Ctx) error {
+	search := strings.TrimSpace(c.Query("q"))
+	resourceFilter := strings.TrimSpace(c.Query("resource"))
+	actionFilter := strings.TrimSpace(c.Query("action"))
+	startDate := strings.TrimSpace(c.Query("start_date"))
+	endDate := strings.TrimSpace(c.Query("end_date"))
+
+	logs, err := h.auditLogService.QueryLogs(search, resourceFilter, actionFilter, startDate, endDate)
+	if err != nil {
+		logs = []models.AuditLog{}
+	}
+
+	stats, _ := h.participantService.GetStats()
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	return h.render(c, "admin_audit_logs.html", AdminAuditLogsData{
+		AdminUser:      adminUser,
+		AdminRole:      adminRole,
+		Logs:           logs,
+		Stats:          stats,
+		Search:         search,
+		FilterResource: resourceFilter,
+		FilterAction:   actionFilter,
+		StartDate:      startDate,
+		EndDate:        endDate,
+	})
+}

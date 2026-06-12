@@ -20,15 +20,17 @@ type NotificationProvider interface {
 
 // NotificationService manages notification templates and dispatches them via registered channels
 type NotificationService struct {
-	db        *gorm.DB
-	providers map[string]NotificationProvider
+	db              *gorm.DB
+	providers       map[string]NotificationProvider
+	auditLogService *AuditLogService
 }
 
 // NewNotificationService creates a new NotificationService
-func NewNotificationService(db *gorm.DB) *NotificationService {
-	mock := NewMockProvider(db)
+func NewNotificationService(db *gorm.DB, auditLog *AuditLogService) *NotificationService {
+	mock := NewMockProvider(db, auditLog)
 	return &NotificationService{
-		db: db,
+		db:              db,
+		auditLogService: auditLog,
 		providers: map[string]NotificationProvider{
 			"whatsapp": mock,
 			"email":    mock,
@@ -132,11 +134,12 @@ func (s *NotificationService) GetAllLogs() ([]models.NotificationLog, error) {
 // ─────────────────────── MockProvider ───────────────────────
 
 type MockProvider struct {
-	db *gorm.DB
+	db              *gorm.DB
+	auditLogService *AuditLogService
 }
 
-func NewMockProvider(db *gorm.DB) *MockProvider {
-	return &MockProvider{db: db}
+func NewMockProvider(db *gorm.DB, auditLog *AuditLogService) *MockProvider {
+	return &MockProvider{db: db, auditLogService: auditLog}
 }
 
 func (p *MockProvider) Send(recipient, message string) error {
@@ -191,7 +194,19 @@ func (p *MockProvider) Send(recipient, message string) error {
 
 	if err := p.db.Create(&logEntry).Error; err != nil {
 		log.Printf("Failed to save notification log: %v", err)
+		if p.auditLogService != nil {
+			_ = p.auditLogService.Log("system", "FAILED", "NOTIFICATION", 0, nil, map[string]interface{}{
+				"recipient": recipient,
+				"channel":   channel,
+				"error":     err.Error(),
+				"message":   message,
+			}, "", "")
+		}
 		return err
+	}
+
+	if p.auditLogService != nil {
+		_ = p.auditLogService.Log("system", "SENT", "NOTIFICATION", logEntry.ID, nil, logEntry, "", "")
 	}
 
 	return nil
