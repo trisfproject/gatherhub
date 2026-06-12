@@ -1,0 +1,29 @@
+# Binaries
+backend/gatherhub
+backend/*.exe
+
+# Environment
+.env
+backend/.env
+
+# Uploads (runtime files, not source)
+storage/uploads/*
+!storage/uploads/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Go build cache
+backend/vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
