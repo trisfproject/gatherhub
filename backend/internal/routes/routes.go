@@ -3,7 +3,6 @@ package routes
 import (
 	"log"
 
-	"github.com/gatherhub/backend/internal/config"
 	"github.com/gatherhub/backend/internal/handlers"
 	"github.com/gatherhub/backend/internal/middleware"
 	"github.com/gatherhub/backend/internal/services"
@@ -14,10 +13,10 @@ import (
 
 // Register sets up all application routes.
 // storage holds the resolved paths for all upload directories.
-func Register(app *fiber.App, db *gorm.DB, storage *config.StorageConfig, adminUsername, adminPassword string, store *session.Store) {
+func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageService, adminUsername, adminPassword string, store *session.Store) {
 	// ── Services ──────────────────────────────────────────────
 	eventService := services.NewEventService(db)
-	participantService := services.NewParticipantService(db, storage.Payments)
+	participantService := services.NewParticipantService(db, storageService)
 
 	adminService := services.NewAdminService(db)
 	if err := adminService.SeedDefaultAdmin(); err != nil {
@@ -32,7 +31,7 @@ func Register(app *fiber.App, db *gorm.DB, storage *config.StorageConfig, adminU
 		log.Fatalf("Failed to initialise page handler: %v", err)
 	}
 
-	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storage.Payments, storage.Events)
+	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storageService)
 	if err != nil {
 		log.Fatalf("Failed to initialise admin handler: %v", err)
 	}
@@ -42,6 +41,7 @@ func Register(app *fiber.App, db *gorm.DB, storage *config.StorageConfig, adminU
 	app.Get("/register", pageHandler.RegisterPage)
 	app.Post("/register", pageHandler.RegisterSubmit)
 	app.Get("/register/success", pageHandler.Success)
+	app.Get("/event/:slug", pageHandler.EventBySlug)
 
 	// ── Infrastructure ────────────────────────────────────────
 	app.Get("/health", healthHandler.Health)

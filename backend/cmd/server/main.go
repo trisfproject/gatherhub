@@ -21,15 +21,10 @@ func main() {
 
 	// ── Initialize storage ────────────────────────────────────
 	// All runtime uploads live under STORAGE_PATH, outside the Git repository.
-	storage := config.NewStorageConfig(cfg.StoragePath)
-
-	if err := storage.Init(); err != nil {
-		log.Fatalf("Failed to initialize storage directories: %v", err)
+	storageService, err := services.NewStorageService(cfg.StoragePath)
+	if err != nil {
+		log.Fatalf("Failed to initialize storage service: %v", err)
 	}
-
-	// Warn if the legacy in-repo storage directory still exists.
-	// The legacy path is two levels up from the backend binary: ../../storage
-	storage.CheckLegacy("../")
 
 	// ── Connect to database ───────────────────────────────────
 	db, err := database.Connect(cfg)
@@ -68,12 +63,12 @@ func main() {
 
 	// ── Serve uploaded files as static assets ─────────────────
 	// Payment proofs → /payments/*
-	app.Static("/payments", storage.Payments, fiber.Static{
+	app.Static("/payments", storageService.GetPaymentsPath(), fiber.Static{
 		MaxAge:   86400,
 		Compress: false,
 	})
 	// Event banners → /events/*
-	app.Static("/events", storage.Events, fiber.Static{
+	app.Static("/events", storageService.GetEventsPath(), fiber.Static{
 		MaxAge:   86400,
 		Compress: false,
 	})
@@ -87,7 +82,7 @@ func main() {
 	})
 
 	// ── Register all routes ───────────────────────────────────
-	routes.Register(app, db, storage, cfg.AdminUsername, cfg.AdminPassword, store)
+	routes.Register(app, db, storageService, cfg.AdminUsername, cfg.AdminPassword, store)
 
 	// ── Start server ──────────────────────────────────────────
 	addr := ":" + cfg.AppPort

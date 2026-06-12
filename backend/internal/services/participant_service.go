@@ -3,9 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
-	"io"
 	"mime/multipart"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -17,13 +15,13 @@ import (
 
 // ParticipantService handles participant registration business logic
 type ParticipantService struct {
-	db        *gorm.DB
-	uploadDir string
+	db             *gorm.DB
+	storageService *StorageService
 }
 
 // NewParticipantService creates a new ParticipantService
-func NewParticipantService(db *gorm.DB, uploadDir string) *ParticipantService {
-	return &ParticipantService{db: db, uploadDir: uploadDir}
+func NewParticipantService(db *gorm.DB, storageService *StorageService) *ParticipantService {
+	return &ParticipantService{db: db, storageService: storageService}
 }
 
 // RegisterForm holds registration input data
@@ -114,31 +112,7 @@ func ValidateFile(file *multipart.FileHeader) error {
 
 // SavePaymentProof saves the uploaded file to storage/payments/ and returns the filename
 func (s *ParticipantService) SavePaymentProof(file *multipart.FileHeader) (string, error) {
-	if err := os.MkdirAll(s.uploadDir, 0755); err != nil {
-		return "", fmt.Errorf("gagal membuat direktori upload: %w", err)
-	}
-
-	ext := strings.ToLower(filepath.Ext(file.Filename))
-	filename := fmt.Sprintf("payment_%d%s", time.Now().UnixNano(), ext)
-	fullPath := filepath.Join(s.uploadDir, filename)
-
-	src, err := file.Open()
-	if err != nil {
-		return "", fmt.Errorf("gagal membuka file: %w", err)
-	}
-	defer src.Close()
-
-	dst, err := os.Create(fullPath)
-	if err != nil {
-		return "", fmt.Errorf("gagal menyimpan file: %w", err)
-	}
-	defer dst.Close()
-
-	if _, err := io.Copy(dst, src); err != nil {
-		return "", fmt.Errorf("gagal menulis file: %w", err)
-	}
-
-	return filename, nil
+	return s.storageService.SavePaymentProof(file)
 }
 
 // generateRegistrationNumber creates a unique GH-YYYY-NNNN registration number

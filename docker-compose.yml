@@ -46,9 +46,8 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      # Runtime storage — sibling directory outside the repository.
-      # Create it first: mkdir -p ../gatherhub-storage
-      - ../gatherhub-storage:/storage
+      # Runtime storage — mounted volume inside repo, ignored by git.
+      - ./runtime-storage:/storage
       - ./frontend:/app/frontend:ro
     depends_on:
       postgres:
@@ -67,8 +66,8 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./frontend:/usr/share/nginx/html:ro
       # Serve uploaded files directly from storage (no round-trip through backend)
-      - ../gatherhub-storage/payments:/var/www/payments:ro
-      - ../gatherhub-storage/events:/var/www/events:ro
+      - ./runtime-storage/payments:/var/www/payments:ro
+      - ./runtime-storage/events:/var/www/events:ro
     depends_on:
       - backend
 

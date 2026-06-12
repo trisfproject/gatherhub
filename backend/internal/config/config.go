@@ -53,8 +53,7 @@ func Load() *Config {
 		DBSSLMode: getEnv("DB_SSLMODE", "disable"),
 
 		// Default points to a sibling directory of the repo root (outside git).
-		// When running inside Docker, override with STORAGE_PATH=/storage.
-		StoragePath: getEnv("STORAGE_PATH", "../gatherhub-storage"),
+		StoragePath: getEnv("STORAGE_PATH", "/storage"),
 
 		FrontendDir: getEnv("FRONTEND_DIR", "../frontend"),
 

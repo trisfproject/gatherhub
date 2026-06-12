@@ -62,10 +62,12 @@ type AdminParticipantDetailData struct {
 }
 
 type AdminEventsData struct {
-	AdminUser string
-	AdminRole string
-	Events    []models.Event
-	Stats     *services.ParticipantStats
+	AdminUser    string
+	AdminRole    string
+	Events       []models.Event
+	Stats        *services.ParticipantStats
+	FlashSuccess string
+	FlashError   string
 }
 
 type AdminEventCreateData struct {
@@ -86,10 +88,12 @@ type AdminEventEditData struct {
 }
 
 type AdminEventDetailData struct {
-	AdminUser string
-	AdminRole string
-	Event     *models.Event
-	Stats     *services.ParticipantStats
+	AdminUser    string
+	AdminRole    string
+	Event        *models.Event
+	Stats        *services.ParticipantStats
+	FlashSuccess string
+	FlashError   string
 }
 
 type AdminAdminsData struct {
@@ -135,8 +139,7 @@ type AdminHandler struct {
 	eventService       *services.EventService
 	store              *session.Store
 	adminService       *services.AdminService
-	paymentDir         string
-	eventsDir          string
+	storageService     *services.StorageService
 	tmpl               *template.Template
 }
 
@@ -146,7 +149,7 @@ func NewAdminHandler(
 	eventService *services.EventService,
 	store *session.Store,
 	adminService *services.AdminService,
-	paymentDir, eventsDir string,
+	storageService *services.StorageService,
 ) (*AdminHandler, error) {
 	funcMap := buildAdminFuncMap()
 	t, err := template.New("").Funcs(funcMap).ParseFS(
@@ -172,8 +175,7 @@ func NewAdminHandler(
 		eventService:       eventService,
 		store:              store,
 		adminService:       adminService,
-		paymentDir:         paymentDir,
-		eventsDir:          eventsDir,
+		storageService:     storageService,
 		tmpl:               t,
 	}, nil
 }
@@ -525,10 +527,12 @@ func (h *AdminHandler) EventList(c *fiber.Ctx) error {
 	adminRole, _ := c.Locals("admin_role").(string)
 	stats, _ := h.participantService.GetStats()
 	return h.render(c, "admin_events.html", AdminEventsData{
-		AdminUser: adminUser,
-		AdminRole: adminRole,
-		Events:    events,
-		Stats:     stats,
+		AdminUser:    adminUser,
+		AdminRole:    adminRole,
+		Events:       events,
+		Stats:        stats,
+		FlashSuccess: getFlash(c, "success"),
+		FlashError:   getFlash(c, "error"),
 	})
 }
 
@@ -665,8 +669,7 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 		} else if file.Size > 10*1024*1024 {
 			errs = append(errs, "Ukuran Banner maksimal 10MB")
 		} else {
-			bannerFilename = fmt.Sprintf("banner_%d%s", time.Now().UnixNano(), ext)
-			err = c.SaveFile(file, filepath.Join(h.eventsDir, bannerFilename))
+			bannerFilename, err = h.storageService.SaveEventBanner(file)
 			if err != nil {
 				errs = append(errs, "Gagal mengunggah Banner: "+err.Error())
 			}
@@ -716,6 +719,7 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 		})
 	}
 
+	setFlash(c, "success", "Acara \""+title+"\" berhasil dibuat.")
 	return c.Redirect("/admin/events", fiber.StatusSeeOther)
 }
 
@@ -897,8 +901,7 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 		} else if file.Size > 10*1024*1024 {
 			errs = append(errs, "Ukuran Banner maksimal 10MB")
 		} else {
-			bannerFilename = fmt.Sprintf("banner_%d%s", time.Now().UnixNano(), ext)
-			err = c.SaveFile(file, filepath.Join(h.eventsDir, bannerFilename))
+			bannerFilename, err = h.storageService.SaveEventBanner(file)
 			if err != nil {
 				errs = append(errs, "Gagal mengunggah Banner: "+err.Error())
 			}
@@ -948,6 +951,7 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 		})
 	}
 
+	setFlash(c, "success", "Acara \""+title+"\" berhasil diperbarui.")
 	return c.Redirect("/admin/events", fiber.StatusSeeOther)
 }
 
@@ -959,15 +963,19 @@ func (h *AdminHandler) EventDelete(c *fiber.Ctx) error {
 	}
 
 	if err := h.eventService.Delete(uint(id)); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		setFlash(c, "error", "Gagal menghapus acara: "+err.Error())
+		if c.Get("HX-Request") == "true" {
+			c.Set("HX-Redirect", "/admin/events")
+			return c.SendStatus(fiber.StatusOK)
+		}
+		return c.Redirect("/admin/events", fiber.StatusSeeOther)
 	}
 
-	// For HTMX delete requests, we trigger a redirect or return empty content
+	setFlash(c, "success", "Acara berhasil dihapus.")
 	if c.Get("HX-Request") == "true" {
 		c.Set("HX-Redirect", "/admin/events")
 		return c.SendStatus(fiber.StatusOK)
 	}
-
 	return c.Redirect("/admin/events", fiber.StatusSeeOther)
 }
 
@@ -988,10 +996,12 @@ func (h *AdminHandler) EventDetail(c *fiber.Ctx) error {
 	stats, _ := h.participantService.GetStats()
 
 	return h.render(c, "admin_event.html", AdminEventDetailData{
-		AdminUser: adminUser,
-		AdminRole: adminRole,
-		Event:     event,
-		Stats:     stats,
+		AdminUser:    adminUser,
+		AdminRole:    adminRole,
+		Event:        event,
+		Stats:        stats,
+		FlashSuccess: getFlash(c, "success"),
+		FlashError:   getFlash(c, "error"),
 	})
 }
 
@@ -1015,9 +1025,16 @@ func (h *AdminHandler) EventUpdateStatus(c *fiber.Ctx) error {
 
 	event.Status = status
 	if err := h.eventService.Update(event); err != nil {
+		setFlash(c, "error", "Gagal memperbarui status acara.")
 		return c.Redirect(fmt.Sprintf("/admin/events/%d", id), fiber.StatusSeeOther)
 	}
 
+	statusLabels := map[string]string{
+		"PUBLISHED": "diterbitkan",
+		"CLOSED":    "ditutup",
+		"DRAFT":     "dikembalikan ke Draft",
+	}
+	setFlash(c, "success", "Acara \"" + event.Title + "\" berhasil " + statusLabels[status] + ".")
 	return c.Redirect(fmt.Sprintf("/admin/events/%d", id), fiber.StatusSeeOther)
 }
 
@@ -1030,6 +1047,33 @@ func (h *AdminHandler) render(c *fiber.Ctx, name string, data any) error {
 	}
 	c.Set("Content-Type", "text/html; charset=utf-8")
 	return c.Status(fiber.StatusOK).Send(buf.Bytes())
+}
+
+// setFlash sets a one-time flash cookie ("flash_success" or "flash_error").
+func setFlash(c *fiber.Ctx, kind, message string) {
+	c.Cookie(&fiber.Cookie{
+		Name:     "flash_" + kind,
+		Value:    message,
+		Path:     "/",
+		HTTPOnly: true,
+		SameSite: "Lax",
+		MaxAge:   30, // 30 seconds — consumed on the very next page load
+	})
+}
+
+// getFlash reads and immediately clears a flash cookie.
+func getFlash(c *fiber.Ctx, kind string) string {
+	val := c.Cookies("flash_" + kind)
+	if val != "" {
+		// Clear the cookie by expiring it
+		c.Cookie(&fiber.Cookie{
+			Name:   "flash_" + kind,
+			Value:  "",
+			Path:   "/",
+			MaxAge: -1,
+		})
+	}
+	return val
 }
 
 // buildStatusFragment returns an HTML snippet for HTMX swap after status update

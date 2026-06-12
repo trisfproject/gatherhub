@@ -47,22 +47,22 @@ GatherHub is a streamlined event registration platform that enables organizers t
 │   ├── .env.example
 │   └── README.md
 │
-└── gatherhub-storage/          ← Runtime uploads (OUTSIDE the repo)
+└── runtime-storage/            # Runtime uploads (Ignored by Git, mounted in Docker)
     ├── payments/               # Payment proof uploads
     ├── events/                 # Event banner uploads
     └── temp/                   # Temporary files
 ```
 
-> **Important:** `gatherhub-storage/` is a sibling of the `gatherhub/` repository directory. It is **never** committed to Git.
+> **Important:** `runtime-storage/` is inside the repository root but ignored via `.gitignore` so uploads are **never** committed to Git. Alternatively, `STORAGE_PATH` can point to any absolute path outside the repository.
 
 ---
 
 ## 📦 Storage Configuration
 
-All runtime uploads are stored outside the Git repository using a single environment variable:
+All runtime uploads are stored outside of Git tracking using a single environment variable:
 
 ```
-STORAGE_PATH=/absolute/path/to/gatherhub-storage
+STORAGE_PATH=/storage
 ```
 
 Sub-directories are created automatically on startup:
@@ -72,6 +72,79 @@ Sub-directories are created automatically on startup:
 | `{STORAGE_PATH}/payments/` | Payment proof uploads (jpg, png, pdf) |
 | `{STORAGE_PATH}/events/` | Event banner images |
 | `{STORAGE_PATH}/temp/` | Temporary/scratch files |
+
+### Storage Mounting & Configuration Examples
+
+GatherHub's storage is completely environment-agnostic; it simply writes to and reads from `STORAGE_PATH` using standard Go file operations. This makes it compatible with any type of local or remote storage mounted at the system level:
+
+#### 1. Local Development (Non-Docker)
+Create a directory on your machine and set `STORAGE_PATH` to its absolute path:
+```bash
+export STORAGE_PATH=/home/username/Dev/event/gatherhub-storage
+```
+
+#### 2. Docker Volumes (Default)
+In `docker-compose.yml`, mount a local folder into the container's `/storage` directory:
+```yaml
+services:
+  backend:
+    environment:
+      STORAGE_PATH: /storage
+    volumes:
+      - ./runtime-storage:/storage
+```
+
+#### 3. Kubernetes Persistent Volume Claim (PVC)
+Mount your PVC directly to the configured path inside the pod definition:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gatherhub-backend
+spec:
+  template:
+    spec:
+      containers:
+      - name: backend
+        image: gatherhub-backend:latest
+        env:
+        - name: STORAGE_PATH
+          value: /var/lib/gatherhub/storage
+        volumeMounts:
+        - name: storage-volume
+          mountPath: /var/lib/gatherhub/storage
+      volumes:
+      - name: storage-volume
+        persistentVolumeClaim:
+          claimName: gatherhub-pvc
+```
+
+#### 4. AWS EFS (Elastic File System)
+EFS can be mounted on the host machine or container orchestration layers. For Docker Compose:
+```yaml
+volumes:
+  efs-storage:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=fs-xxxxxx.efs.us-east-1.amazonaws.com,rw,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport
+      device: ":"
+
+services:
+  backend:
+    environment:
+      STORAGE_PATH: /storage
+    volumes:
+      - efs-storage:/storage
+```
+
+#### 5. NFS / SMB / CIFS Share
+Mount the share at the OS level (e.g. via `/etc/fstab`) and set the `STORAGE_PATH` to the mount point:
+```bash
+# Example mounting NFS to /mnt/gatherhub-storage
+mount -t nfs 192.168.1.100:/shares/gatherhub /mnt/gatherhub-storage
+export STORAGE_PATH=/mnt/gatherhub-storage
+```
 
 ---
 
@@ -135,20 +208,13 @@ curl http://localhost:3000/health
 
 ## 🐳 Docker Usage
 
-### 1. Create the storage directory
-
-```bash
-# Sibling of the repo directory
-mkdir -p ../gatherhub-storage/{payments,events,temp}
-```
-
-### 2. Start all services
+### 1. Start all services
 
 ```bash
 docker compose up -d
 ```
 
-The compose file mounts `../gatherhub-storage` as `/storage` inside the backend container and `STORAGE_PATH=/storage` is set automatically.
+The compose file mounts `./runtime-storage` as `/storage` inside the backend container and `STORAGE_PATH=/storage` is set automatically. The directories `payments/`, `events/`, and `temp/` will be created automatically inside `./runtime-storage`.
 
 | Service  | Port | Description              |
 |----------|------|--------------------------|
@@ -190,7 +256,7 @@ docker compose up -d
 | `DB_PASSWORD`    | `gatherhub`            | Database password                          |
 | `DB_NAME`        | `gatherhub`            | Database name                              |
 | `DB_SSLMODE`     | `disable`              | PostgreSQL SSL mode                        |
-| `STORAGE_PATH`   | `../gatherhub-storage` | **Root path for all runtime uploads**      |
+| `STORAGE_PATH`   | `/storage`             | **Root path for all runtime uploads**      |
 | `FRONTEND_DIR`   | `../frontend`          | Frontend static files directory            |
 | `ADMIN_USERNAME` | `admin`                | Default admin username (seed only)         |
 | `ADMIN_PASSWORD` | `admin123`             | Default admin password (seed only)         |

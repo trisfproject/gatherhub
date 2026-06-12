@@ -33,9 +33,6 @@ ENV TZ=Asia/Jakarta
 # Copy binary from builder
 COPY --from=builder /build/gatherhub .
 
-# Create uploads directory
-RUN mkdir -p /app/uploads
-
 # Non-root user
 RUN addgroup -S gatherhub && adduser -S gatherhub -G gatherhub
 RUN chown -R gatherhub:gatherhub /app
@@ -44,6 +41,6 @@ USER gatherhub
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://localhost:3000/health || exit 1
+    CMD wget -qO- http://127.0.0.1:3000/health || exit 1
 
 CMD ["./gatherhub"]

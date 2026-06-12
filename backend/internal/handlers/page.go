@@ -21,6 +21,11 @@ type LandingData struct {
 	Event *models.Event
 }
 
+// EventPublicData is the template data for the public event detail page by slug
+type EventPublicData struct {
+	Event *models.Event
+}
+
 // RegisterData is the template data for the registration form page
 type RegisterData struct {
 	Event  *models.Event
@@ -50,7 +55,7 @@ func NewPageHandler(
 	participantService *services.ParticipantService,
 ) (*PageHandler, error) {
 	funcMap := buildFuncMap()
-	t, err := template.New("").Funcs(funcMap).ParseFS(templ.Files, "landing.html", "register.html", "success.html")
+	t, err := template.New("").Funcs(funcMap).ParseFS(templ.Files, "landing.html", "register.html", "success.html", "event_public.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse templates: %w", err)
 	}
@@ -76,7 +81,11 @@ func (h *PageHandler) Landing(c *fiber.Ctx) error {
 func (h *PageHandler) RegisterPage(c *fiber.Ctx) error {
 	event, err := h.eventService.GetFirst()
 	if err != nil {
-		return c.Redirect("/", fiber.StatusSeeOther)
+		return h.renderError(c, "Tidak ada acara yang membuka pendaftaran saat ini.", "/")
+	}
+	// Guard: only PUBLISHED events with an open registration window accept new registrations
+	if guardMsg := registrationGuard(event); guardMsg != "" {
+		return h.renderError(c, guardMsg, "/")
 	}
 	return h.render(c, "register.html", RegisterData{
 		Event: event,
@@ -84,11 +93,25 @@ func (h *PageHandler) RegisterPage(c *fiber.Ctx) error {
 	})
 }
 
+// EventBySlug handles GET /event/:slug — public event detail page
+func (h *PageHandler) EventBySlug(c *fiber.Ctx) error {
+	slug := c.Params("slug")
+	event, err := h.eventService.GetBySlug(slug)
+	if err != nil {
+		return h.renderError(c, "Acara tidak ditemukan.", "/")
+	}
+	return h.render(c, "event_public.html", EventPublicData{Event: event})
+}
+
 // RegisterSubmit handles POST /register — process form submission
 func (h *PageHandler) RegisterSubmit(c *fiber.Ctx) error {
 	event, err := h.eventService.GetFirst()
 	if err != nil {
 		return c.Redirect("/", fiber.StatusSeeOther)
+	}
+	// Guard: reject submissions for non-PUBLISHED / closed-window events
+	if guardMsg := registrationGuard(event); guardMsg != "" {
+		return h.renderError(c, guardMsg, "/")
 	}
 
 	// Parse form fields
@@ -255,6 +278,22 @@ func formToMap(form *services.RegisterForm) map[string]string {
 		"telegram_username": form.TelegramUsername,
 		"job_title":         form.JobTitle,
 	}
+}
+
+// registrationGuard returns a human-readable error message if the event does not
+// currently accept registrations, or an empty string if registration is allowed.
+func registrationGuard(event *models.Event) string {
+	if event.Status != "PUBLISHED" {
+		return "Pendaftaran untuk acara ini tidak tersedia saat ini."
+	}
+	now := time.Now()
+	if !event.RegistrationOpen.IsZero() && now.Before(event.RegistrationOpen) {
+		return "Pendaftaran belum dibuka. Silakan coba lagi nanti."
+	}
+	if !event.RegistrationClose.IsZero() && now.After(event.RegistrationClose) {
+		return "Pendaftaran sudah ditutup."
+	}
+	return ""
 }
 
 // ─────────────────────── Template Functions ───────────────────────

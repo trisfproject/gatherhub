@@ -6,26 +6,10 @@ backend/*.exe
 .env
 backend/.env
 
-# ── Runtime storage (must live OUTSIDE the repository) ────────
-# Legacy in-repo paths — prevent accidental commit of uploads
-storage/
-storage/uploads/
-storage/payments/
-storage/events/
-storage/temp/
-# Keep placeholder markers if any exist
-!storage/**/.gitkeep
-
-# Also guard against any uploads accidentally placed inside backend/
-backend/uploads/
-!backend/uploads/.gitkeep
-
-# External storage root (sibling directory, not inside repo)
-# gatherhub-storage/ lives at the same level as gatherhub/
-# Nothing from there should ever end up here, but guard just in case:
-payments/
-events/
-temp/
+# ── Runtime storage ───────────────────────────────────────────
+# Ignore the local mounted runtime storage folder to prevent committing uploads
+runtime-storage/
+gatherhub-storage/
 
 # ── Go build cache ────────────────────────────────────────────
 backend/vendor/

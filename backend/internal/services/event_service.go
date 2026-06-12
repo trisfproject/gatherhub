@@ -57,11 +57,12 @@ func (s *EventService) GetFirst() (*models.Event, error) {
 	return &event, result.Error
 }
 
-// Create saves a new event to the database
+// Create saves a new event to the database.
+// If the new event is PUBLISHED, all other currently-published events are set to CLOSED.
 func (s *EventService) Create(event *models.Event) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		if event.Status == "PUBLISHED" {
-			if err := tx.Model(&models.Event{}).Where("status = ?", "PUBLISHED").Update("status", "DRAFT").Error; err != nil {
+			if err := tx.Model(&models.Event{}).Where("status = ?", "PUBLISHED").Update("status", "CLOSED").Error; err != nil {
 				return err
 			}
 		}
@@ -69,11 +70,12 @@ func (s *EventService) Create(event *models.Event) error {
 	})
 }
 
-// Update updates an existing event in the database
+// Update updates an existing event in the database.
+// If the updated event is PUBLISHED, all other currently-published events are set to CLOSED.
 func (s *EventService) Update(event *models.Event) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		if event.Status == "PUBLISHED" {
-			if err := tx.Model(&models.Event{}).Where("id != ? AND status = ?", event.ID, "PUBLISHED").Update("status", "DRAFT").Error; err != nil {
+			if err := tx.Model(&models.Event{}).Where("id != ? AND status = ?", event.ID, "PUBLISHED").Update("status", "CLOSED").Error; err != nil {
 				return err
 			}
 		}
