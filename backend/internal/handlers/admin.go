@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"log"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	templ "github.com/gatherhub/backend/internal/templates"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/session"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // ─────────────────────── Data structs ───────────────────────
@@ -24,14 +26,16 @@ type AdminLoginData struct {
 }
 
 type AdminDashboardData struct {
-	AdminUser    string
-	Stats        *services.ParticipantStats
+	AdminUser     string
+	AdminRole     string
+	Stats         *services.ParticipantStats
 	RecentPending []models.Participant
-	Event        *models.Event
+	Event         *models.Event
 }
 
 type AdminParticipantsData struct {
 	AdminUser    string
+	AdminRole    string
 	Participants []models.Participant
 	Stats        *services.ParticipantStats
 	Filter       string
@@ -41,6 +45,7 @@ type AdminParticipantsData struct {
 
 type AdminParticipantDetailData struct {
 	AdminUser   string
+	AdminRole   string
 	Participant *models.Participant
 	Event       *models.Event
 	PaymentURL  string
@@ -49,12 +54,14 @@ type AdminParticipantDetailData struct {
 
 type AdminEventsData struct {
 	AdminUser string
+	AdminRole string
 	Events    []models.Event
 	Stats     *services.ParticipantStats
 }
 
 type AdminEventCreateData struct {
 	AdminUser string
+	AdminRole string
 	Errors    []string
 	Form      map[string]string
 	Stats     *services.ParticipantStats
@@ -62,10 +69,53 @@ type AdminEventCreateData struct {
 
 type AdminEventEditData struct {
 	AdminUser string
+	AdminRole string
 	Event     *models.Event
 	Errors    []string
 	Form      map[string]string
 	Stats     *services.ParticipantStats
+}
+
+type AdminEventDetailData struct {
+	AdminUser string
+	AdminRole string
+	Event     *models.Event
+	Stats     *services.ParticipantStats
+}
+
+type AdminAdminsData struct {
+	AdminUser string
+	AdminRole string
+	Admins    []models.Admin
+	Stats     *services.ParticipantStats
+}
+
+type AdminAdminCreateData struct {
+	AdminUser string
+	AdminRole string
+	Errors    []string
+	Form      map[string]string
+	Stats     *services.ParticipantStats
+}
+
+type AdminAdminEditData struct {
+	AdminUser string
+	AdminRole string
+	Admin     *models.Admin
+	Errors    []string
+	Form      map[string]string
+	Stats     *services.ParticipantStats
+}
+
+type AdminSettingsData struct {
+	AdminUser      string
+	AdminRole      string
+	PlatformName   string
+	Maintenance    bool
+	MaxUploadSize  string
+	SuccessMessage string
+	Errors         []string
+	Stats          *services.ParticipantStats
 }
 
 // ─────────────────────── Handler ───────────────────────
@@ -75,8 +125,7 @@ type AdminHandler struct {
 	participantService *services.ParticipantService
 	eventService       *services.EventService
 	store              *session.Store
-	adminUsername      string
-	adminPassword      string
+	adminService       *services.AdminService
 	paymentDir         string
 	eventsDir          string
 	tmpl               *template.Template
@@ -87,7 +136,8 @@ func NewAdminHandler(
 	participantService *services.ParticipantService,
 	eventService *services.EventService,
 	store *session.Store,
-	adminUsername, adminPassword, paymentDir, eventsDir string,
+	adminService *services.AdminService,
+	paymentDir, eventsDir string,
 ) (*AdminHandler, error) {
 	funcMap := buildAdminFuncMap()
 	t, err := template.New("").Funcs(funcMap).ParseFS(
@@ -97,8 +147,13 @@ func NewAdminHandler(
 		"admin_participants.html",
 		"admin_participant.html",
 		"admin_events.html",
+		"admin_event.html",
 		"admin_event_create.html",
 		"admin_event_edit.html",
+		"admin_admins.html",
+		"admin_admin_create.html",
+		"admin_admin_edit.html",
+		"admin_settings.html",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse admin templates: %w", err)
@@ -107,8 +162,7 @@ func NewAdminHandler(
 		participantService: participantService,
 		eventService:       eventService,
 		store:              store,
-		adminUsername:      adminUsername,
-		adminPassword:      adminPassword,
+		adminService:       adminService,
 		paymentDir:         paymentDir,
 		eventsDir:          eventsDir,
 		tmpl:               t,
@@ -134,7 +188,8 @@ func (h *AdminHandler) LoginSubmit(c *fiber.Ctx) error {
 	username := strings.TrimSpace(c.FormValue("username"))
 	password := c.FormValue("password")
 
-	if username != h.adminUsername || password != h.adminPassword {
+	admin, err := h.adminService.Authenticate(username, password)
+	if err != nil {
 		return h.render(c, "admin_login.html", AdminLoginData{
 			Error: "Username atau password salah. Coba lagi.",
 		})
@@ -146,7 +201,8 @@ func (h *AdminHandler) LoginSubmit(c *fiber.Ctx) error {
 		return h.render(c, "admin_login.html", AdminLoginData{Error: "Gagal membuat sesi. Coba lagi."})
 	}
 	sess.Set("admin_authenticated", true)
-	sess.Set("admin_username", username)
+	sess.Set("admin_username", admin.Username)
+	sess.Set("admin_role", admin.Role)
 	if err := sess.Save(); err != nil {
 		return h.render(c, "admin_login.html", AdminLoginData{Error: "Gagal menyimpan sesi. Coba lagi."})
 	}
@@ -178,9 +234,11 @@ func (h *AdminHandler) Dashboard(c *fiber.Ctx) error {
 
 	event, _ := h.eventService.GetFirst()
 	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
 
 	return h.render(c, "admin_dashboard.html", AdminDashboardData{
 		AdminUser:     adminUser,
+		AdminRole:     adminRole,
 		Stats:         stats,
 		RecentPending: pending,
 		Event:         event,
@@ -200,9 +258,11 @@ func (h *AdminHandler) ParticipantList(c *fiber.Ctx) error {
 	stats, _ := h.participantService.GetStats()
 	event, _ := h.eventService.GetFirst()
 	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
 
 	return h.render(c, "admin_participants.html", AdminParticipantsData{
 		AdminUser:    adminUser,
+		AdminRole:    adminRole,
 		Participants: participants,
 		Stats:        stats,
 		Filter:       filter,
@@ -225,6 +285,7 @@ func (h *AdminHandler) ParticipantDetail(c *fiber.Ctx) error {
 
 	event, _ := h.eventService.GetFirst()
 	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
 
 	paymentURL := ""
 	if participant.PaymentProof != "" {
@@ -235,6 +296,7 @@ func (h *AdminHandler) ParticipantDetail(c *fiber.Ctx) error {
 
 	return h.render(c, "admin_participant.html", AdminParticipantDetailData{
 		AdminUser:   adminUser,
+		AdminRole:   adminRole,
 		Participant: participant,
 		Event:       event,
 		PaymentURL:  paymentURL,
@@ -279,9 +341,11 @@ func (h *AdminHandler) EventList(c *fiber.Ctx) error {
 		events = []models.Event{}
 	}
 	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
 	stats, _ := h.participantService.GetStats()
 	return h.render(c, "admin_events.html", AdminEventsData{
 		AdminUser: adminUser,
+		AdminRole: adminRole,
 		Events:    events,
 		Stats:     stats,
 	})
@@ -290,9 +354,11 @@ func (h *AdminHandler) EventList(c *fiber.Ctx) error {
 // EventCreatePage handles GET /admin/events/create
 func (h *AdminHandler) EventCreatePage(c *fiber.Ctx) error {
 	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
 	stats, _ := h.participantService.GetStats()
 	return h.render(c, "admin_event_create.html", AdminEventCreateData{
 		AdminUser: adminUser,
+		AdminRole: adminRole,
 		Form:      map[string]string{},
 		Stats:     stats,
 	})
@@ -301,6 +367,7 @@ func (h *AdminHandler) EventCreatePage(c *fiber.Ctx) error {
 // EventCreateSubmit handles POST /admin/events/create
 func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
 
 	title := strings.TrimSpace(c.FormValue("title"))
 	slug := strings.TrimSpace(strings.ToLower(c.FormValue("slug")))
@@ -429,6 +496,7 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 		stats, _ := h.participantService.GetStats()
 		return h.render(c, "admin_event_create.html", AdminEventCreateData{
 			AdminUser: adminUser,
+			AdminRole: adminRole,
 			Errors:    errs,
 			Form:      formValues,
 			Stats:     stats,
@@ -460,6 +528,7 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 		stats, _ := h.participantService.GetStats()
 		return h.render(c, "admin_event_create.html", AdminEventCreateData{
 			AdminUser: adminUser,
+			AdminRole: adminRole,
 			Errors:    errs,
 			Form:      formValues,
 			Stats:     stats,
@@ -482,6 +551,7 @@ func (h *AdminHandler) EventEditPage(c *fiber.Ctx) error {
 	}
 
 	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
 
 	formValues := map[string]string{
 		"title":                  event.Title,
@@ -510,6 +580,7 @@ func (h *AdminHandler) EventEditPage(c *fiber.Ctx) error {
 
 	return h.render(c, "admin_event_edit.html", AdminEventEditData{
 		AdminUser: adminUser,
+		AdminRole: adminRole,
 		Event:     event,
 		Form:      formValues,
 		Stats:     stats,
@@ -529,6 +600,7 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 	}
 
 	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
 
 	title := strings.TrimSpace(c.FormValue("title"))
 	slug := strings.TrimSpace(strings.ToLower(c.FormValue("slug")))
@@ -656,6 +728,7 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 		stats, _ := h.participantService.GetStats()
 		return h.render(c, "admin_event_edit.html", AdminEventEditData{
 			AdminUser: adminUser,
+			AdminRole: adminRole,
 			Event:     event,
 			Errors:    errs,
 			Form:      formValues,
@@ -686,6 +759,7 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 		stats, _ := h.participantService.GetStats()
 		return h.render(c, "admin_event_edit.html", AdminEventEditData{
 			AdminUser: adminUser,
+			AdminRole: adminRole,
 			Event:     event,
 			Errors:    errs,
 			Form:      formValues,
@@ -714,6 +788,56 @@ func (h *AdminHandler) EventDelete(c *fiber.Ctx) error {
 	}
 
 	return c.Redirect("/admin/events", fiber.StatusSeeOther)
+}
+
+// EventDetail handles GET /admin/events/:id
+func (h *AdminHandler) EventDetail(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		return c.Redirect("/admin/events", fiber.StatusSeeOther)
+	}
+
+	event, err := h.eventService.GetByID(uint(id))
+	if err != nil {
+		return c.Redirect("/admin/events", fiber.StatusSeeOther)
+	}
+
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+	stats, _ := h.participantService.GetStats()
+
+	return h.render(c, "admin_event.html", AdminEventDetailData{
+		AdminUser: adminUser,
+		AdminRole: adminRole,
+		Event:     event,
+		Stats:     stats,
+	})
+}
+
+// EventUpdateStatus handles POST /admin/events/:id/status
+func (h *AdminHandler) EventUpdateStatus(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		return c.Redirect("/admin/events", fiber.StatusSeeOther)
+	}
+
+	status := strings.ToUpper(strings.TrimSpace(c.FormValue("status")))
+	allowedStatus := map[string]bool{"DRAFT": true, "PUBLISHED": true, "CLOSED": true}
+	if !allowedStatus[status] {
+		return c.Redirect(fmt.Sprintf("/admin/events/%d", id), fiber.StatusSeeOther)
+	}
+
+	event, err := h.eventService.GetByID(uint(id))
+	if err != nil {
+		return c.Redirect("/admin/events", fiber.StatusSeeOther)
+	}
+
+	event.Status = status
+	if err := h.eventService.Update(event); err != nil {
+		return c.Redirect(fmt.Sprintf("/admin/events/%d", id), fiber.StatusSeeOther)
+	}
+
+	return c.Redirect(fmt.Sprintf("/admin/events/%d", id), fiber.StatusSeeOther)
 }
 
 // ─────────────────────── Helpers ───────────────────────
@@ -788,6 +912,332 @@ DITOLAK</span>`
 <span class="w-2 h-2 bg-amber-400 rounded-full" style="animation:pulse 2s infinite"></span>
 MENUNGGU</span>`
 	}
+}
+
+// ─────────────────────── Admin Management Handlers (SUPER_ADMIN) ───────────────────────
+
+// AdminList handles GET /admin/admins
+func (h *AdminHandler) AdminList(c *fiber.Ctx) error {
+	admins, err := h.adminService.GetAllAdmins()
+	if err != nil {
+		admins = []models.Admin{}
+	}
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+	stats, _ := h.participantService.GetStats()
+
+	return h.render(c, "admin_admins.html", AdminAdminsData{
+		AdminUser: adminUser,
+		AdminRole: adminRole,
+		Admins:    admins,
+		Stats:     stats,
+	})
+}
+
+// AdminCreatePage handles GET /admin/admins/create
+func (h *AdminHandler) AdminCreatePage(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+	stats, _ := h.participantService.GetStats()
+
+	return h.render(c, "admin_admin_create.html", AdminAdminCreateData{
+		AdminUser: adminUser,
+		AdminRole: adminRole,
+		Form:      map[string]string{},
+		Stats:     stats,
+	})
+}
+
+// AdminCreateSubmit handles POST /admin/admins/create
+func (h *AdminHandler) AdminCreateSubmit(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+	stats, _ := h.participantService.GetStats()
+
+	name := strings.TrimSpace(c.FormValue("name"))
+	username := strings.TrimSpace(c.FormValue("username"))
+	email := strings.TrimSpace(c.FormValue("email"))
+	password := c.FormValue("password")
+	role := strings.TrimSpace(c.FormValue("role"))
+
+	formValues := map[string]string{
+		"name":     name,
+		"username": username,
+		"email":    email,
+		"role":     role,
+	}
+
+	var errs []string
+	if name == "" { errs = append(errs, "Nama Lengkap wajib diisi") }
+	if username == "" { errs = append(errs, "Username wajib diisi") }
+	if email == "" { errs = append(errs, "Email wajib diisi") }
+	if password == "" { errs = append(errs, "Password wajib diisi") }
+	if role != "SUPER_ADMIN" && role != "ADMIN" { errs = append(errs, "Role tidak valid") }
+
+	// Check if username/email already exists
+	if username != "" {
+		if _, err := h.adminService.GetByUsername(username); err == nil {
+			errs = append(errs, "Username sudah digunakan")
+		}
+	}
+	if email != "" {
+		if _, err := h.adminService.GetByEmail(email); err == nil {
+			errs = append(errs, "Email sudah digunakan")
+		}
+	}
+
+	if len(errs) > 0 {
+		return h.render(c, "admin_admin_create.html", AdminAdminCreateData{
+			AdminUser: adminUser,
+			AdminRole: adminRole,
+			Errors:    errs,
+			Form:      formValues,
+			Stats:     stats,
+		})
+	}
+
+	// Password hash using bcrypt
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		errs = append(errs, "Gagal memproses password: "+err.Error())
+		return h.render(c, "admin_admin_create.html", AdminAdminCreateData{
+			AdminUser: adminUser,
+			AdminRole: adminRole,
+			Errors:    errs,
+			Form:      formValues,
+			Stats:     stats,
+		})
+	}
+
+	newAdmin := &models.Admin{
+		Name:         name,
+		Username:     username,
+		Email:        email,
+		PasswordHash: string(hash),
+		Role:         role,
+	}
+
+	if err := h.adminService.CreateAdmin(newAdmin); err != nil {
+		errs = append(errs, "Gagal membuat Admin: "+err.Error())
+		return h.render(c, "admin_admin_create.html", AdminAdminCreateData{
+			AdminUser: adminUser,
+			AdminRole: adminRole,
+			Errors:    errs,
+			Form:      formValues,
+			Stats:     stats,
+		})
+	}
+
+	return c.Redirect("/admin/admins", fiber.StatusSeeOther)
+}
+
+// AdminEditPage handles GET /admin/admins/:id/edit
+func (h *AdminHandler) AdminEditPage(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		return c.Redirect("/admin/admins", fiber.StatusSeeOther)
+	}
+
+	admin, err := h.adminService.GetAdminByID(uint(id))
+	if err != nil {
+		return c.Redirect("/admin/admins", fiber.StatusSeeOther)
+	}
+
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+	stats, _ := h.participantService.GetStats()
+
+	formValues := map[string]string{
+		"name":     admin.Name,
+		"username": admin.Username,
+		"email":    admin.Email,
+		"role":     admin.Role,
+	}
+
+	return h.render(c, "admin_admin_edit.html", AdminAdminEditData{
+		AdminUser: adminUser,
+		AdminRole: adminRole,
+		Admin:     admin,
+		Form:      formValues,
+		Stats:     stats,
+	})
+}
+
+// AdminEditSubmit handles POST /admin/admins/:id/edit
+func (h *AdminHandler) AdminEditSubmit(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		return c.Redirect("/admin/admins", fiber.StatusSeeOther)
+	}
+
+	admin, err := h.adminService.GetAdminByID(uint(id))
+	if err != nil {
+		return c.Redirect("/admin/admins", fiber.StatusSeeOther)
+	}
+
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+	stats, _ := h.participantService.GetStats()
+
+	name := strings.TrimSpace(c.FormValue("name"))
+	email := strings.TrimSpace(c.FormValue("email"))
+	password := c.FormValue("password")
+	role := strings.TrimSpace(c.FormValue("role"))
+
+	formValues := map[string]string{
+		"name":     name,
+		"username": admin.Username,
+		"email":    email,
+		"role":     role,
+	}
+
+	var errs []string
+	if name == "" { errs = append(errs, "Nama Lengkap wajib diisi") }
+	if email == "" { errs = append(errs, "Email wajib diisi") }
+	if role != "SUPER_ADMIN" && role != "ADMIN" { errs = append(errs, "Role tidak valid") }
+
+	// Check email uniqueness if modified
+	if email != "" && email != admin.Email {
+		if _, err := h.adminService.GetByEmail(email); err == nil {
+			errs = append(errs, "Email sudah digunakan oleh admin lain")
+		}
+	}
+
+	if len(errs) > 0 {
+		return h.render(c, "admin_admin_edit.html", AdminAdminEditData{
+			AdminUser: adminUser,
+			AdminRole: adminRole,
+			Admin:     admin,
+			Errors:    errs,
+			Form:      formValues,
+			Stats:     stats,
+		})
+	}
+
+	admin.Name = name
+	admin.Email = email
+	admin.Role = role
+
+	if password != "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			errs = append(errs, "Gagal memproses password baru: "+err.Error())
+			return h.render(c, "admin_admin_edit.html", AdminAdminEditData{
+				AdminUser: adminUser,
+				AdminRole: adminRole,
+				Admin:     admin,
+				Errors:    errs,
+				Form:      formValues,
+				Stats:     stats,
+			})
+		}
+		admin.PasswordHash = string(hash)
+	}
+
+	if err := h.adminService.UpdateAdmin(admin); err != nil {
+		errs = append(errs, "Gagal memperbarui Admin: "+err.Error())
+		return h.render(c, "admin_admin_edit.html", AdminAdminEditData{
+			AdminUser: adminUser,
+			AdminRole: adminRole,
+			Admin:     admin,
+			Errors:    errs,
+			Form:      formValues,
+			Stats:     stats,
+		})
+	}
+
+	return c.Redirect("/admin/admins", fiber.StatusSeeOther)
+}
+
+// AdminDelete handles POST /admin/admins/:id/delete or DELETE /admin/admins/:id
+func (h *AdminHandler) AdminDelete(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ID"})
+	}
+
+	admin, err := h.adminService.GetAdminByID(uint(id))
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Admin tidak ditemukan"})
+	}
+
+	loggedInUser, _ := c.Locals("admin_username").(string)
+	if admin.Username == loggedInUser {
+		if c.Get("HX-Request") == "true" {
+			c.Set("HX-Trigger", "adminDeleteError")
+			return c.Status(fiber.StatusBadRequest).SendString("Anda tidak dapat menghapus akun Anda sendiri!")
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Anda tidak dapat menghapus akun Anda sendiri!"})
+	}
+
+	if err := h.adminService.DeleteAdmin(uint(id)); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	if c.Get("HX-Request") == "true" {
+		c.Set("HX-Redirect", "/admin/admins")
+		return c.SendStatus(fiber.StatusOK)
+	}
+
+	return c.Redirect("/admin/admins", fiber.StatusSeeOther)
+}
+
+// ─────────────────────── System Settings Handlers (SUPER_ADMIN) ───────────────────────
+
+// SystemSettingsPage handles GET /admin/settings
+func (h *AdminHandler) SystemSettingsPage(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+	stats, _ := h.participantService.GetStats()
+
+	// Default/Mock settings
+	return h.render(c, "admin_settings.html", AdminSettingsData{
+		AdminUser:     adminUser,
+		AdminRole:     adminRole,
+		PlatformName:  "GatherHub",
+		Maintenance:   false,
+		MaxUploadSize: "10 MB",
+		Stats:         stats,
+	})
+}
+
+// SystemSettingsSubmit handles POST /admin/settings
+func (h *AdminHandler) SystemSettingsSubmit(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+	stats, _ := h.participantService.GetStats()
+
+	platformName := strings.TrimSpace(c.FormValue("platform_name"))
+	maintenance := c.FormValue("maintenance") == "true"
+	maxUploadSize := strings.TrimSpace(c.FormValue("max_upload_size"))
+
+	var errs []string
+	if platformName == "" { errs = append(errs, "Nama Platform wajib diisi") }
+	if maxUploadSize == "" { errs = append(errs, "Maksimum Upload wajib diisi") }
+
+	if len(errs) > 0 {
+		return h.render(c, "admin_settings.html", AdminSettingsData{
+			AdminUser:     adminUser,
+			AdminRole:     adminRole,
+			PlatformName:  platformName,
+			Maintenance:   maintenance,
+			MaxUploadSize: maxUploadSize,
+			Errors:        errs,
+			Stats:         stats,
+		})
+	}
+
+	log.Printf("System settings updated by %s: Platform=%s, Maintenance=%v, MaxUpload=%s", adminUser, platformName, maintenance, maxUploadSize)
+
+	return h.render(c, "admin_settings.html", AdminSettingsData{
+		AdminUser:      adminUser,
+		AdminRole:      adminRole,
+		PlatformName:   platformName,
+		Maintenance:    maintenance,
+		MaxUploadSize:  maxUploadSize,
+		SuccessMessage: "Pengaturan sistem berhasil disimpan!",
+		Stats:          stats,
+	})
 }
 
 // ─────────────────────── Template Functions ───────────────────────

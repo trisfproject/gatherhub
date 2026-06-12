@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Manajemen Acara — GatherHub Admin</title>
+  <title>Kelola Admin — GatherHub Admin</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2" crossorigin="anonymous"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
@@ -27,9 +27,8 @@
 
     /* Badges */
     .badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:.72rem;font-weight:700;border:1px solid}
-    .badge-draft{background:rgba(245,158,11,.12);color:#fbbf24;border-color:rgba(245,158,11,.25)}
-    .badge-published{background:rgba(16,185,129,.12);color:#34d399;border-color:rgba(16,185,129,.25)}
-    .badge-closed{background:rgba(239,68,68,.12);color:#f87171;border-color:rgba(239,68,68,.25)}
+    .badge-super{background:rgba(139,92,246,.15);color:#c084fc;border-color:rgba(139,92,246,.3)}
+    .badge-admin{background:rgba(59,130,246,.15);color:#60a5fa;border-color:rgba(59,130,246,.3)}
 
     @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
     .fade-up{animation:fadeUp .35s ease both}
@@ -66,14 +65,14 @@
       <span class="ml-auto bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold px-2 py-0.5 rounded-full">{{.Stats.Pending}}</span>
       {{end}}
     </a>
-    <a href="/admin/events" class="nav-item active">
+    <a href="/admin/events" class="nav-item">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
       </svg>
       Acara
     </a>
     {{if eq .AdminRole "SUPER_ADMIN"}}
-    <a href="/admin/admins" class="nav-item">
+    <a href="/admin/admins" class="nav-item active">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
       </svg>
@@ -109,109 +108,73 @@
 </aside>
 
 <!-- ─── MAIN CONTENT ─── -->
-<div class="main-content flex-1">
+<div class="main-content flex-1 flex flex-col">
   <div class="topbar">
     <div>
-      <h2 class="text-base font-bold text-white">Manajemen Acara</h2>
-      <p class="text-xs text-white/30">Daftar semua acara yang terdaftar di platform</p>
+      <h2 class="text-base font-bold text-white">Kelola Administrator</h2>
+      <p class="text-xs text-white/30">Daftar pengguna dengan hak akses administratif</p>
     </div>
-    <div class="flex items-center gap-3">
-      <div class="flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-3 py-1.5">
-        <span class="text-xs text-indigo-300 font-bold">{{.AdminRole}}</span>
-      </div>
-      <a href="/admin/events/create"
+    <div>
+      <a href="/admin/admins/create"
          class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-xl text-sm transition-colors">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
         </svg>
-        Tambah Acara
+        Tambah Admin
       </a>
     </div>
   </div>
 
   <div class="p-6">
-    {{if .Events}}
+    <div id="error-message" class="hidden mb-6 bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-sm font-semibold flex items-center gap-2">
+      <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+      <span id="error-text"></span>
+    </div>
+
+    {{if .Admins}}
     <div class="glass overflow-hidden fade-up">
       <div class="overflow-x-auto">
         <table class="data-table">
           <thead>
             <tr>
-              <th>Detail Acara</th>
-              <th>Waktu & Lokasi</th>
-              <th>Biaya Pendaftaran</th>
-              <th>Maks. Peserta</th>
-              <th>Status</th>
+              <th>Nama</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Peran (Role)</th>
+              <th>Dibuat Pada</th>
               <th class="text-right">Aksi</th>
             </tr>
           </thead>
           <tbody>
-            {{range .Events}}
+            {{range .Admins}}
             <tr>
               <td>
-                <div class="flex items-center gap-3">
-                  {{if .BannerImage}}
-                  <div class="w-12 h-12 rounded-lg bg-black/40 overflow-hidden flex-shrink-0 border border-white/10">
-                    <img src="/events/{{.BannerImage}}" alt="Banner" class="w-full h-full object-cover"/>
-                  </div>
-                  {{else}}
-                  <div class="w-12 h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 text-white/25">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                  </div>
-                  {{end}}
-                  <div>
-                    <div class="font-bold text-white leading-snug">
-                      <a href="/admin/events/{{.ID}}" class="hover:text-indigo-400 transition-colors">{{.Title}}</a>
-                    </div>
-                    <div class="text-xs text-white/35 font-mono mt-0.5">/{{.Slug}}</div>
-                  </div>
-                </div>
+                <div class="font-bold text-white">{{.Name}}</div>
               </td>
               <td>
-                <div class="font-semibold text-white/80 text-sm">{{.EventDate | formatDateShort}}</div>
-                <div class="text-xs text-white/40 mt-0.5 truncate max-w-[200px]" title="{{.Location}}">{{.Location}}</div>
+                <span class="font-mono text-white/60 text-sm">@{{.Username}}</span>
               </td>
               <td>
-                <span class="text-emerald-300 font-bold text-sm">{{.Price | formatPrice}}</span>
+                <span class="text-white/80 text-sm">{{.Email}}</span>
               </td>
               <td>
-                <div class="text-sm font-semibold text-white/80">
-                  {{if gt .MaxParticipants 0}}
-                    {{.MaxParticipants}} orang
-                  {{else}}
-                    Tanpa Batas
-                  {{end}}
-                </div>
-              </td>
-              <td>
-                {{if isEq .Status "PUBLISHED"}}
-                <span class="badge badge-published">
-                  <svg class="w-3 h-3 pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                  PUBLISHED
-                </span>
-                {{else if isEq .Status "CLOSED"}}
-                <span class="badge badge-closed">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                  CLOSED
-                </span>
+                {{if eq .Role "SUPER_ADMIN"}}
+                <span class="badge badge-super">SUPER_ADMIN</span>
                 {{else}}
-                <span class="badge badge-draft">
-                  <span class="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
-                  DRAFT
-                </span>
+                <span class="badge badge-admin">ADMIN</span>
                 {{end}}
+              </td>
+              <td>
+                <span class="text-white/40 text-xs font-medium">{{.CreatedAt | formatDateTime}}</span>
               </td>
               <td class="text-right">
                 <div class="flex items-center justify-end gap-3" onclick="event.stopPropagation()">
-                  <a href="/admin/events/{{.ID}}"
-                     class="text-xs bg-emerald-500/10 border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-300 font-bold px-3 py-1.5 rounded-lg transition-all">
-                    Detail
-                  </a>
-                  <a href="/admin/events/{{.ID}}/edit"
+                  <a href="/admin/admins/{{.ID}}/edit"
                      class="text-xs bg-indigo-500/10 border border-indigo-500/30 hover:border-indigo-500/60 text-indigo-300 font-bold px-3 py-1.5 rounded-lg transition-all">
                     Edit
                   </a>
-                  <button hx-delete="/admin/events/{{.ID}}"
-                          hx-confirm="Apakah Anda yakin ingin menghapus acara ini? Semua data pendaftaran terkait juga akan dihapus secara permanen!"
+                  <button hx-delete="/admin/admins/{{.ID}}"
+                          hx-confirm="Apakah Anda yakin ingin menghapus akun admin ini?"
                           hx-target="body"
                           class="text-xs bg-red-500/10 border border-red-500/30 hover:bg-red-500/60 text-red-400 font-bold px-3 py-1.5 rounded-lg transition-all">
                     Hapus
@@ -224,28 +187,33 @@
         </table>
       </div>
       <div class="px-5 py-3 border-t border-white/6 text-xs text-white/30 font-medium">
-        Total {{len .Events}} acara terdaftar
+        Total {{len .Admins}} admin terdaftar
       </div>
     </div>
     {{else}}
     <div class="glass p-16 text-center fade-up">
       <div class="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4 border border-white/10">
         <svg class="w-8 h-8 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
         </svg>
       </div>
-      <h3 class="text-white font-bold text-lg mb-1">Belum Ada Acara</h3>
-      <p class="text-white/40 text-sm max-w-sm mx-auto mb-6">Mulai buat acara pertama Anda untuk membuka pendaftaran publik.</p>
-      <a href="/admin/events/create"
-         class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors mx-auto">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-        Buat Acara Pertama
-      </a>
+      <h3 class="text-white font-bold text-lg mb-1">Belum Ada Admin</h3>
+      <p class="text-white/40 text-sm max-w-sm mx-auto mb-6">Tambahkan admin baru untuk membantu mengelola pendaftaran.</p>
     </div>
     {{end}}
   </div>
 </div>
 
 </div>
+
+<script>
+  document.body.addEventListener('adminDeleteError', function(evt) {
+    const errorMsg = document.getElementById('error-message');
+    const errorText = document.getElementById('error-text');
+    errorText.innerText = "Anda tidak dapat menghapus akun Anda sendiri!";
+    errorMsg.classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+</script>
 </body>
 </html>

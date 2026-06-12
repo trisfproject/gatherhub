@@ -42,11 +42,54 @@ func AdminAuth(store *session.Store) fiber.Handler {
 			return c.Redirect("/admin/login", fiber.StatusSeeOther)
 		}
 
-		// Propagate admin username to downstream handlers
+		// Propagate admin username and role to downstream handlers
 		adminUser, _ := sess.Get("admin_username").(string)
+		adminRole, _ := sess.Get("admin_role").(string)
+
 		c.Locals("admin_username", adminUser)
+		c.Locals("admin_role", adminRole)
 
 		return c.Next()
+	}
+}
+
+// RequireRole checks if the authenticated admin has one of the allowed roles.
+// On failure it returns a 403 response.
+func RequireRole(store *session.Store, allowedRoles ...string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		sess, err := store.Get(c)
+		if err != nil {
+			return c.Redirect("/admin/login", fiber.StatusSeeOther)
+		}
+
+		role, _ := sess.Get("admin_role").(string)
+		for _, allowed := range allowedRoles {
+			if role == allowed {
+				return c.Next()
+			}
+		}
+
+		// Forbidden
+		if c.Get("HX-Request") == "true" || c.Get("Accept") == "application/json" {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Forbidden",
+			})
+		}
+
+		html := fmt.Sprintf(`<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"/><title>Akses Ditolak — GatherHub</title>
+<script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-[#07071a] text-white min-h-screen flex items-center justify-center">
+<div class="text-center px-6">
+  <div class="text-6xl mb-6">🚫</div>
+  <h1 class="text-2xl font-bold mb-3">Akses Ditolak</h1>
+  <p class="text-white/60 mb-8 font-semibold">Anda tidak memiliki izin (peran %s) untuk mengakses halaman ini.</p>
+  <a href="/admin/dashboard" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 font-semibold px-6 py-3 rounded-xl text-sm transition-colors">
+    Kembali ke Dashboard
+  </a>
+</div></body></html>`, role)
+
+		c.Set("Content-Type", "text/html; charset=utf-8")
+		return c.Status(fiber.StatusForbidden).SendString(html)
 	}
 }
 

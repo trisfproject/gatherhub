@@ -17,6 +17,11 @@ func Register(app *fiber.App, db *gorm.DB, paymentUploadDir, eventsUploadDir, ad
 	eventService := services.NewEventService(db)
 	participantService := services.NewParticipantService(db, paymentUploadDir)
 
+	adminService := services.NewAdminService(db)
+	if err := adminService.SeedDefaultAdmin(); err != nil {
+		log.Printf("Warning: failed to seed default admin: %v", err)
+	}
+
 	// ── Handlers ──────────────────────────────────────────
 	healthHandler := handlers.NewHealthHandler(db)
 
@@ -25,7 +30,7 @@ func Register(app *fiber.App, db *gorm.DB, paymentUploadDir, eventsUploadDir, ad
 		log.Fatalf("Failed to initialise page handler: %v", err)
 	}
 
-	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminUsername, adminPassword, paymentUploadDir, eventsUploadDir)
+	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, paymentUploadDir, eventsUploadDir)
 	if err != nil {
 		log.Fatalf("Failed to initialise admin handler: %v", err)
 	}
@@ -74,10 +79,24 @@ func Register(app *fiber.App, db *gorm.DB, paymentUploadDir, eventsUploadDir, ad
 	admin.Get("/events", adminHandler.EventList)
 	admin.Get("/events/create", adminHandler.EventCreatePage)
 	admin.Post("/events/create", adminHandler.EventCreateSubmit)
+	admin.Get("/events/:id", adminHandler.EventDetail)
 	admin.Get("/events/:id/edit", adminHandler.EventEditPage)
 	admin.Post("/events/:id/edit", adminHandler.EventEditSubmit)
+	admin.Post("/events/:id/status", adminHandler.EventUpdateStatus)
 	admin.Delete("/events/:id", adminHandler.EventDelete)
 	admin.Post("/events/:id/delete", adminHandler.EventDelete)
+
+	// Admin management & settings (SUPER_ADMIN only)
+	superAdmin := admin.Group("/", middleware.RequireRole(store, "SUPER_ADMIN"))
+	superAdmin.Get("/admins", adminHandler.AdminList)
+	superAdmin.Get("/admins/create", adminHandler.AdminCreatePage)
+	superAdmin.Post("/admins/create", adminHandler.AdminCreateSubmit)
+	superAdmin.Get("/admins/:id/edit", adminHandler.AdminEditPage)
+	superAdmin.Post("/admins/:id/edit", adminHandler.AdminEditSubmit)
+	superAdmin.Delete("/admins/:id", adminHandler.AdminDelete)
+	superAdmin.Post("/admins/:id/delete", adminHandler.AdminDelete)
+	superAdmin.Get("/settings", adminHandler.SystemSettingsPage)
+	superAdmin.Post("/settings", adminHandler.SystemSettingsSubmit)
 
 	app.Get("/admin", func(c *fiber.Ctx) error {
 		return c.Redirect("/admin/dashboard", fiber.StatusSeeOther)

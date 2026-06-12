@@ -26,10 +26,10 @@ func (s *EventService) GetAll() ([]models.Event, error) {
 	return events, result.Error
 }
 
-// GetByID returns a single event by ID
+// GetByID returns a single event by ID, preloading its participants
 func (s *EventService) GetByID(id uint) (*models.Event, error) {
 	var event models.Event
-	result := s.db.First(&event, id)
+	result := s.db.Preload("Participants").First(&event, id)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("event with id %d not found", id)
 	}
@@ -59,12 +59,26 @@ func (s *EventService) GetFirst() (*models.Event, error) {
 
 // Create saves a new event to the database
 func (s *EventService) Create(event *models.Event) error {
-	return s.db.Create(event).Error
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if event.Status == "PUBLISHED" {
+			if err := tx.Model(&models.Event{}).Where("status = ?", "PUBLISHED").Update("status", "DRAFT").Error; err != nil {
+				return err
+			}
+		}
+		return tx.Create(event).Error
+	})
 }
 
 // Update updates an existing event in the database
 func (s *EventService) Update(event *models.Event) error {
-	return s.db.Save(event).Error
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if event.Status == "PUBLISHED" {
+			if err := tx.Model(&models.Event{}).Where("id != ? AND status = ?", event.ID, "PUBLISHED").Update("status", "DRAFT").Error; err != nil {
+				return err
+			}
+		}
+		return tx.Save(event).Error
+	})
 }
 
 // Delete removes an event and all its associated participants
