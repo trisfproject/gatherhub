@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
@@ -27,11 +28,17 @@ type AdminLoginData struct {
 }
 
 type AdminDashboardData struct {
-	AdminUser     string
-	AdminRole     string
-	Stats         *services.ParticipantStats
-	RecentPending []models.Participant
-	Event         *models.Event
+	AdminUser           string
+	AdminRole           string
+	Stats               *services.ParticipantStats
+	RecentRegistrations []models.Participant
+	RecentVerifications []models.Participant
+	Events              []models.Event
+	SelectedEventID     uint
+	SelectedEvent       *models.Event
+	StartDate           string
+	EndDate             string
+	AnalyticsJSON       string
 }
 
 type AdminParticipantsData struct {
@@ -232,27 +239,66 @@ func (h *AdminHandler) Logout(c *fiber.Ctx) error {
 
 // Dashboard handles GET /admin/dashboard
 func (h *AdminHandler) Dashboard(c *fiber.Ctx) error {
-	stats, err := h.participantService.GetStats()
+	eventIDStr := c.Query("event_id")
+	var selectedEventID uint
+	if eventIDStr != "" {
+		if id, err := strconv.Atoi(eventIDStr); err == nil {
+			selectedEventID = uint(id)
+		}
+	} else {
+		// Default to first published event
+		if firstEvent, err := h.eventService.GetFirst(); err == nil && firstEvent != nil {
+			selectedEventID = firstEvent.ID
+		}
+	}
+
+	startDate := strings.TrimSpace(c.Query("start_date"))
+	endDate := strings.TrimSpace(c.Query("end_date"))
+
+	stats, err := h.participantService.GetFilteredStats(selectedEventID, startDate, endDate)
 	if err != nil {
 		stats = &services.ParticipantStats{}
 	}
 
-	// Most recent pending participants (limit 5)
-	pending, _ := h.participantService.GetAllForAdmin("PENDING", "")
-	if len(pending) > 5 {
-		pending = pending[:5]
+	recentRegs, _ := h.participantService.GetLatestRegistrations(selectedEventID, 5)
+	recentVerifs, _ := h.participantService.GetLatestVerifications(selectedEventID, 5)
+
+	events, _ := h.eventService.GetAll()
+
+	var selectedEvent *models.Event
+	for i := range events {
+		if events[i].ID == selectedEventID {
+			selectedEvent = &events[i]
+			break
+		}
 	}
 
-	event, _ := h.eventService.GetFirst()
+	analytics, err := h.participantService.GetAnalytics(selectedEventID, startDate, endDate)
+	var analyticsJSON string
+	if err == nil && analytics != nil {
+		if bytes, err := json.Marshal(analytics); err == nil {
+			analyticsJSON = string(bytes)
+		}
+	}
+	if analyticsJSON == "" {
+		analyticsJSON = "{}"
+	}
+
 	adminUser, _ := c.Locals("admin_username").(string)
 	adminRole, _ := c.Locals("admin_role").(string)
 
 	return h.render(c, "admin_dashboard.html", AdminDashboardData{
-		AdminUser:     adminUser,
-		AdminRole:     adminRole,
-		Stats:         stats,
-		RecentPending: pending,
-		Event:         event,
+		AdminUser:           adminUser,
+		AdminRole:           adminRole,
+		Stats:               stats,
+		RecentRegistrations: recentRegs,
+		RecentVerifications: recentVerifs,
+		Events:              events,
+		SelectedEventID:     selectedEventID,
+		SelectedEvent:       selectedEvent,
+		StartDate:           startDate,
+		EndDate:             endDate,
+		AnalyticsJSON:       analyticsJSON,
 	})
 }
 

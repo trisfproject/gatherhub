@@ -302,3 +302,165 @@ func (s *ParticipantService) UpdateStatus(id uint, status models.ParticipantStat
 
 	return &p, nil
 }
+
+// DayRegistration represents registration count for a specific day
+type DayRegistration struct {
+	Date  string `json:"date"`
+	Count int64  `json:"count"`
+}
+
+// CityDistribution represents participant count for a specific city
+type CityDistribution struct {
+	City  string `json:"city"`
+	Count int64  `json:"count"`
+}
+
+// EstateDistribution represents participant count for a specific industrial estate
+type EstateDistribution struct {
+	IndustrialEstate string `json:"industrial_estate"`
+	Count            int64  `json:"count"`
+}
+
+// DashboardAnalytics holds aggregated data for charts
+type DashboardAnalytics struct {
+	RegistrationsByDay   []DayRegistration    `json:"registrations_by_day"`
+	ParticipantsByCity   []CityDistribution   `json:"participants_by_city"`
+	ParticipantsByEstate []EstateDistribution `json:"participants_by_estate"`
+}
+
+// GetFilteredStats returns aggregated participant counts per status matching active filters
+func (s *ParticipantService) GetFilteredStats(eventID uint, startDate, endDate string) (*ParticipantStats, error) {
+	stats := &ParticipantStats{}
+
+	q := s.db.Model(&models.Participant{})
+	if eventID > 0 {
+		q = q.Where("event_id = ?", eventID)
+	}
+	if startDate != "" {
+		q = q.Where("created_at >= ?", startDate)
+	}
+	if endDate != "" {
+		q = q.Where("created_at <= ?", endDate+" 23:59:59")
+	}
+
+	type row struct {
+		Status models.ParticipantStatus
+		Count  int64
+	}
+	var rows []row
+
+	if err := q.Select("status, count(*) as count").
+		Group("status").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	for _, r := range rows {
+		stats.Total += r.Count
+		switch r.Status {
+		case models.StatusPending:
+			stats.Pending = r.Count
+		case models.StatusVerified:
+			stats.Verified = r.Count
+		case models.StatusRejected:
+			stats.Rejected = r.Count
+		}
+	}
+
+	return stats, nil
+}
+
+// GetAnalytics returns aggregated chart data matching active filters
+func (s *ParticipantService) GetAnalytics(eventID uint, startDate, endDate string) (*DashboardAnalytics, error) {
+	analytics := &DashboardAnalytics{
+		RegistrationsByDay:   []DayRegistration{},
+		ParticipantsByCity:   []CityDistribution{},
+		ParticipantsByEstate: []EstateDistribution{},
+	}
+
+	// 1. Registrations by day
+	qDay := s.db.Model(&models.Participant{})
+	if eventID > 0 {
+		qDay = qDay.Where("event_id = ?", eventID)
+	}
+	if startDate != "" {
+		qDay = qDay.Where("created_at >= ?", startDate)
+	}
+	if endDate != "" {
+		qDay = qDay.Where("created_at <= ?", endDate+" 23:59:59")
+	}
+
+	if err := qDay.Select("TO_CHAR(created_at, 'YYYY-MM-DD') as date, count(*) as count").
+		Group("TO_CHAR(created_at, 'YYYY-MM-DD')").
+		Order("date ASC").
+		Scan(&analytics.RegistrationsByDay).Error; err != nil {
+		return nil, err
+	}
+
+	// 2. Participants by City
+	qCity := s.db.Model(&models.Participant{})
+	if eventID > 0 {
+		qCity = qCity.Where("event_id = ?", eventID)
+	}
+	if startDate != "" {
+		qCity = qCity.Where("created_at >= ?", startDate)
+	}
+	if endDate != "" {
+		qCity = qCity.Where("created_at <= ?", endDate+" 23:59:59")
+	}
+
+	if err := qCity.Select("city, count(*) as count").
+		Where("city IS NOT NULL AND city != ''").
+		Group("city").
+		Order("count DESC").
+		Limit(10).
+		Scan(&analytics.ParticipantsByCity).Error; err != nil {
+		return nil, err
+	}
+
+	// 3. Participants by Industrial Estate
+	qEstate := s.db.Model(&models.Participant{})
+	if eventID > 0 {
+		qEstate = qEstate.Where("event_id = ?", eventID)
+	}
+	if startDate != "" {
+		qEstate = qEstate.Where("created_at >= ?", startDate)
+	}
+	if endDate != "" {
+		qEstate = qEstate.Where("created_at <= ?", endDate+" 23:59:59")
+	}
+
+	if err := qEstate.Select("industrial_estate, count(*) as count").
+		Where("industrial_estate IS NOT NULL AND industrial_estate != ''").
+		Group("industrial_estate").
+		Order("count DESC").
+		Limit(10).
+		Scan(&analytics.ParticipantsByEstate).Error; err != nil {
+		return nil, err
+	}
+
+	return analytics, nil
+}
+
+// GetLatestRegistrations returns the most recent registrants
+func (s *ParticipantService) GetLatestRegistrations(eventID uint, limit int) ([]models.Participant, error) {
+	var participants []models.Participant
+	q := s.db.Model(&models.Participant{})
+	if eventID > 0 {
+		q = q.Where("event_id = ?", eventID)
+	}
+	err := q.Preload("Event").Order("created_at DESC").Limit(limit).Find(&participants).Error
+	return participants, err
+}
+
+// GetLatestVerifications returns the most recent verified participants
+func (s *ParticipantService) GetLatestVerifications(eventID uint, limit int) ([]models.Participant, error) {
+	var participants []models.Participant
+	q := s.db.Model(&models.Participant{}).Where("status = ? AND verified_at IS NOT NULL", models.StatusVerified)
+	if eventID > 0 {
+		q = q.Where("event_id = ?", eventID)
+	}
+	err := q.Preload("Event").Order("verified_at DESC").Limit(limit).Find(&participants).Error
+	return participants, err
+}
+

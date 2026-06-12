@@ -6,6 +6,7 @@
   <title>Dashboard — GatherHub Admin</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
     *{box-sizing:border-box}
@@ -144,16 +145,61 @@
       <div class="flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-3 py-1.5">
         <span class="text-xs text-indigo-300 font-bold">{{.AdminRole}}</span>
       </div>
-      {{if .Event}}
+      {{if .SelectedEvent}}
       <div class="hidden sm:flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5">
         <div class="w-2 h-2 bg-emerald-400 rounded-full pulse"></div>
-        <span class="text-xs text-white/60 font-medium">{{.Event.Title | truncate 40}}</span>
+        <span class="text-xs text-white/60 font-medium">{{.SelectedEvent.Title | truncate 40}}</span>
+      </div>
+      {{else}}
+      <div class="hidden sm:flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5">
+        <div class="w-2 h-2 bg-indigo-400 rounded-full pulse"></div>
+        <span class="text-xs text-white/60 font-medium">Semua Acara</span>
       </div>
       {{end}}
     </div>
   </div>
 
   <div class="p-6 space-y-6">
+
+    <!-- ── Filter Bar ── -->
+    <div class="glass p-4 fade-up">
+      <form method="GET" action="/admin/dashboard" class="flex flex-col md:flex-row md:items-end gap-4">
+        <!-- Event Dropdown -->
+        <div class="flex-1">
+          <label class="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Pilih Acara</label>
+          <select name="event_id" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors">
+            <option value="0" {{if eq .SelectedEventID 0}}selected{{end}} class="bg-[#13132b] text-white">Semua Acara</option>
+            {{range .Events}}
+            <option value="{{.ID}}" {{if eq $.SelectedEventID .ID}}selected{{end}} class="bg-[#13132b] text-white">{{.Title}}</option>
+            {{end}}
+          </select>
+        </div>
+
+        <!-- Start Date -->
+        <div>
+          <label class="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Tanggal Mulai</label>
+          <input type="date" name="start_date" value="{{.StartDate}}"
+                 class="w-full md:w-48 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors"/>
+        </div>
+
+        <!-- End Date -->
+        <div>
+          <label class="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Tanggal Selesai</label>
+          <input type="date" name="end_date" value="{{.EndDate}}"
+                 class="w-full md:w-48 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors"/>
+        </div>
+
+        <!-- Buttons -->
+        <div class="flex items-center gap-2">
+          <button type="submit" class="flex-1 md:flex-initial bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors border border-indigo-500/30 shadow-lg shadow-indigo-600/10">
+            Terapkan
+          </button>
+          <a href="/admin/dashboard" class="flex-1 md:flex-initial text-center bg-white/5 hover:bg-white/10 text-white/60 font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors border border-white/5">
+            Reset
+          </a>
+        </div>
+      </form>
+    </div>
 
     <!-- ── Stats Row ── -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 fade-up">
@@ -210,28 +256,188 @@
       </div>
     </div>
 
+    <!-- ── Charts Row ── -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 fade-up">
+      <!-- Registrations by Day (Line Chart) -->
+      <div class="lg:col-span-2 glass p-6 flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-white text-base">Registrasi Per Hari</h3>
+          <span class="text-xs text-white/40">Tren pendaftaran peserta</span>
+        </div>
+        <div id="registrations-by-day-empty" class="hidden flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[300px]">
+          <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-3">
+            <svg class="w-6 h-6 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+          </div>
+          <p class="text-white/40 text-sm font-medium">Tidak ada data pendaftaran dalam periode ini</p>
+        </div>
+        <div id="registrations-by-day-container" class="relative flex-1 min-h-[300px]">
+          <canvas id="registrationsByDayChart"></canvas>
+        </div>
+      </div>
+
+      <!-- City Distribution (Bar Chart) -->
+      <div class="glass p-6 flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-white text-base">Peserta Per Kota</h3>
+          <span class="text-xs text-white/40">Top 10 Kota</span>
+        </div>
+        <div id="participants-by-city-empty" class="hidden flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[300px]">
+          <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-3">
+            <svg class="w-6 h-6 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </div>
+          <p class="text-white/40 text-sm font-medium">Tidak ada data kota asal peserta</p>
+        </div>
+        <div id="participants-by-city-container" class="relative flex-1 min-h-[300px]">
+          <canvas id="participantsByCityChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Estate Distribution (Bar Chart) -->
+    <div class="glass p-6 flex flex-col fade-up">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-white text-base">Peserta Per Kawasan Industri</h3>
+        <span class="text-xs text-white/40">Top 10 Kawasan Industri</span>
+      </div>
+      <div id="participants-by-estate-empty" class="hidden flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[250px]">
+        <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-3">
+          <svg class="w-6 h-6 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+          </svg>
+        </div>
+        <p class="text-white/40 text-sm font-medium">Tidak ada data kawasan industri</p>
+      </div>
+      <div id="participants-by-estate-container" class="relative flex-1 min-h-[250px]">
+        <canvas id="participantsByEstateChart"></canvas>
+      </div>
+    </div>
+
+    <!-- ── Recent Activities Grid ── -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 fade-up">
+      <!-- Latest Registrations -->
+      <div class="glass p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-white text-base">Pendaftaran Terbaru</h3>
+          <span class="text-xs text-white/40">5 Pendaftar Terakhir</span>
+        </div>
+        {{if .RecentRegistrations}}
+        <div class="overflow-x-auto -mx-2">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>No. Reg</th>
+                <th>Nama Lengkap</th>
+                <th>Perusahaan</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {{range .RecentRegistrations}}
+              <tr>
+                <td class="font-mono text-indigo-300 text-xs">{{.RegistrationNumber}}</td>
+                <td class="font-semibold text-white truncate max-w-[120px]">{{.FullName}}</td>
+                <td class="text-white/60 truncate max-w-[120px]">{{.CompanyName | defaultStr "-"}}</td>
+                <td><span class="badge {{statusClass .Status}}">{{statusLabel .Status}}</span></td>
+                <td>
+                  <a href="/admin/participants/{{.ID}}"
+                     class="text-xs text-indigo-400 hover:text-indigo-300 font-bold transition-colors whitespace-nowrap">
+                    Detail
+                  </a>
+                </td>
+              </tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+        {{else}}
+        <div class="p-8 text-center">
+          <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mx-auto mb-3">
+            <svg class="w-6 h-6 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+            </svg>
+          </div>
+          <p class="text-white/45 text-sm font-semibold">Belum ada pendaftaran terbaru</p>
+        </div>
+        {{end}}
+      </div>
+
+      <!-- Latest Verifications -->
+      <div class="glass p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-white text-base">Verifikasi Terbaru</h3>
+          <span class="text-xs text-white/40">5 Verifikasi Terakhir</span>
+        </div>
+        {{if .RecentVerifications}}
+        <div class="overflow-x-auto -mx-2">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>No. Reg</th>
+                <th>Nama Lengkap</th>
+                <th>Perusahaan</th>
+                <th>Tanggal Verif</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {{range .RecentVerifications}}
+              <tr>
+                <td class="font-mono text-indigo-300 text-xs">{{.RegistrationNumber}}</td>
+                <td class="font-semibold text-white truncate max-w-[120px]">{{.FullName}}</td>
+                <td class="text-white/60 truncate max-w-[120px]">{{.CompanyName | defaultStr "-"}}</td>
+                <td class="text-white/50 text-xs">{{formatPtrDateTime .VerifiedAt}}</td>
+                <td>
+                  <a href="/admin/participants/{{.ID}}"
+                     class="text-xs text-indigo-400 hover:text-indigo-300 font-bold transition-colors whitespace-nowrap">
+                    Detail
+                  </a>
+                </td>
+              </tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+        {{else}}
+        <div class="p-8 text-center">
+          <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mx-auto mb-3">
+            <svg class="w-6 h-6 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <p class="text-white/45 text-sm font-semibold">Belum ada verifikasi terbaru</p>
+        </div>
+        {{end}}
+      </div>
+    </div>
+
     <!-- ── Event Info + Quick Actions ── -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-      {{if .Event}}
+      {{if .SelectedEvent}}
       <div class="lg:col-span-2 glass p-6">
         <p class="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-3">Acara Aktif</p>
-        <h3 class="text-white font-bold text-lg leading-snug mb-4">{{.Event.Title}}</h3>
+        <h3 class="text-white font-bold text-lg leading-snug mb-4">{{.SelectedEvent.Title}}</h3>
         <div class="grid grid-cols-2 gap-3 text-sm">
           <div class="bg-white/4 rounded-xl p-3.5">
             <p class="text-white/35 text-xs mb-1">Tanggal</p>
-            <p class="text-white font-semibold">{{.Event.EventDate | formatDateLong}}</p>
+            <p class="text-white font-semibold">{{.SelectedEvent.EventDate | formatDateLong}}</p>
           </div>
           <div class="bg-white/4 rounded-xl p-3.5">
             <p class="text-white/35 text-xs mb-1">Lokasi</p>
-            <p class="text-white font-semibold truncate">{{.Event.Location}}</p>
+            <p class="text-white font-semibold truncate">{{.SelectedEvent.Location}}</p>
           </div>
           <div class="bg-white/4 rounded-xl p-3.5">
             <p class="text-white/35 text-xs mb-1">Biaya</p>
-            <p class="text-emerald-300 font-bold">{{.Event.Price | formatPrice}}</p>
+            <p class="text-emerald-300 font-bold">{{.SelectedEvent.Price | formatPrice}}</p>
           </div>
           <div class="bg-white/4 rounded-xl p-3.5">
             <p class="text-white/35 text-xs mb-1">Admin Acara</p>
-            <p class="text-white font-semibold">{{.Event.AdminName}}</p>
+            <p class="text-white font-semibold">{{.SelectedEvent.AdminName}}</p>
           </div>
         </div>
       </div>
@@ -264,61 +470,202 @@
       </div>
     </div>
 
-    <!-- ── Recent Pending Table ── -->
-    {{if .RecentPending}}
-    <div class="glass p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="font-bold text-white">Pendaftar Terbaru (Menunggu)</h3>
-        <a href="/admin/participants?status=PENDING" class="text-indigo-400 hover:text-indigo-300 text-xs font-bold transition-colors">
-          Lihat semua →
-        </a>
-      </div>
-      <div class="overflow-x-auto -mx-2">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>No. Reg</th>
-              <th>Nama Lengkap</th>
-              <th>Perusahaan</th>
-              <th>Tanggal Daftar</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {{range .RecentPending}}
-            <tr>
-              <td class="font-mono text-indigo-300 text-xs">{{.RegistrationNumber}}</td>
-              <td class="font-semibold text-white">{{.FullName}}</td>
-              <td class="text-white/60">{{.CompanyName | truncate 30}}</td>
-              <td class="text-white/50 text-xs">{{.CreatedAt | formatDateTime}}</td>
-              <td><span class="badge badge-pending"><span class="w-1.5 h-1.5 bg-amber-400 rounded-full pulse"></span>Menunggu</span></td>
-              <td>
-                <a href="/admin/participants/{{.ID}}"
-                   class="text-xs text-indigo-400 hover:text-indigo-300 font-bold transition-colors whitespace-nowrap">
-                  Detail →
-                </a>
-              </td>
-            </tr>
-            {{end}}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    {{else}}
-    <div class="glass p-10 text-center">
-      <div class="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-3">
-        <svg class="w-7 h-7 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-        </svg>
-      </div>
-      <p class="text-white/50 font-semibold">Tidak ada pendaftaran yang menunggu verifikasi.</p>
-    </div>
-    {{end}}
-
   </div><!-- /p-6 -->
 </div><!-- /main-content -->
 </div><!-- /flex -->
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  let analyticsData = {};
+  try {
+    analyticsData = JSON.parse({{.AnalyticsJSON}});
+  } catch(e) {
+    console.error("Failed to parse analytics JSON", e);
+  }
+
+  const registrations = analyticsData.registrations_by_day || [];
+  const cities = analyticsData.participants_by_city || [];
+  const estates = analyticsData.participants_by_estate || [];
+
+  // Chart defaults for dark theme
+  const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        backgroundColor: '#13132b',
+        titleColor: '#fff',
+        bodyColor: 'rgba(255, 255, 255, 0.8)',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderWidth: 1,
+        padding: 12,
+        cornerRadius: 8,
+        displayColors: false,
+        titleFont: {
+          family: 'Plus Jakarta Sans',
+          weight: 'bold'
+        },
+        bodyFont: {
+          family: 'Plus Jakarta Sans'
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          color: 'rgba(255, 255, 255, 0.05)',
+          drawBorder: false
+        },
+        ticks: {
+          color: 'rgba(255, 255, 255, 0.5)',
+          font: {
+            family: 'Plus Jakarta Sans',
+            size: 10
+          }
+        }
+      },
+      y: {
+        grid: {
+          color: 'rgba(255, 255, 255, 0.05)',
+          drawBorder: false
+        },
+        ticks: {
+          color: 'rgba(255, 255, 255, 0.5)',
+          font: {
+            family: 'Plus Jakarta Sans',
+            size: 10
+          },
+          precision: 0
+        }
+      }
+    }
+  };
+
+  // 1. Registrations By Day Line Chart
+  if (registrations.length === 0) {
+    document.getElementById('registrations-by-day-empty').classList.remove('hidden');
+    document.getElementById('registrations-by-day-container').classList.add('hidden');
+  } else {
+    const ctxDay = document.getElementById('registrationsByDayChart').getContext('2d');
+    const gradientDay = ctxDay.createLinearGradient(0, 0, 0, 300);
+    gradientDay.addColorStop(0, 'rgba(99, 102, 241, 0.3)');
+    gradientDay.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
+
+    new Chart(ctxDay, {
+      type: 'line',
+      data: {
+        labels: registrations.map(d => d.date),
+        datasets: [{
+          label: 'Registrasi',
+          data: registrations.map(d => d.count),
+          borderColor: 'rgb(99, 102, 241)',
+          backgroundColor: gradientDay,
+          fill: true,
+          tension: 0.3,
+          borderWidth: 2,
+          pointBackgroundColor: 'rgb(139, 92, 246)',
+          pointBorderColor: '#fff',
+          pointHoverRadius: 6
+        }]
+      },
+      options: chartDefaults
+    });
+  }
+
+  // 2. Participants By City Bar Chart
+  if (cities.length === 0) {
+    document.getElementById('participants-by-city-empty').classList.remove('hidden');
+    document.getElementById('participants-by-city-container').classList.add('hidden');
+  } else {
+    const ctxCity = document.getElementById('participantsByCityChart').getContext('2d');
+    const gradientCity = ctxCity.createLinearGradient(0, 0, 300, 0);
+    gradientCity.addColorStop(0, 'rgba(16, 185, 129, 0.8)');
+    gradientCity.addColorStop(1, 'rgba(16, 185, 129, 0.2)');
+
+    new Chart(ctxCity, {
+      type: 'bar',
+      data: {
+        labels: cities.map(c => c.city),
+        datasets: [{
+          data: cities.map(c => c.count),
+          backgroundColor: gradientCity,
+          borderColor: 'rgb(16, 185, 129)',
+          borderWidth: 1,
+          borderRadius: 6,
+          borderSkipped: false
+        }]
+      },
+      options: {
+        ...chartDefaults,
+        indexAxis: 'y',
+        scales: {
+          x: {
+            ...chartDefaults.scales.x,
+            ticks: {
+              ...chartDefaults.scales.x.ticks,
+              precision: 0
+            }
+          },
+          y: {
+            ...chartDefaults.scales.y,
+            grid: {
+              display: false
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // 3. Participants By Estate Bar Chart
+  if (estates.length === 0) {
+    document.getElementById('participants-by-estate-empty').classList.remove('hidden');
+    document.getElementById('participants-by-estate-container').classList.add('hidden');
+  } else {
+    const ctxEstate = document.getElementById('participantsByEstateChart').getContext('2d');
+    const gradientEstate = ctxEstate.createLinearGradient(0, 0, 300, 0);
+    gradientEstate.addColorStop(0, 'rgba(245, 158, 11, 0.8)');
+    gradientEstate.addColorStop(1, 'rgba(245, 158, 11, 0.2)');
+
+    new Chart(ctxEstate, {
+      type: 'bar',
+      data: {
+        labels: estates.map(e => e.industrial_estate),
+        datasets: [{
+          data: estates.map(e => e.count),
+          backgroundColor: gradientEstate,
+          borderColor: 'rgb(245, 158, 11)',
+          borderWidth: 1,
+          borderRadius: 6,
+          borderSkipped: false
+        }]
+      },
+      options: {
+        ...chartDefaults,
+        indexAxis: 'y',
+        scales: {
+          x: {
+            ...chartDefaults.scales.x,
+            ticks: {
+              ...chartDefaults.scales.x.ticks,
+              precision: 0
+            }
+          },
+          y: {
+            ...chartDefaults.scales.y,
+            grid: {
+              display: false
+            }
+          }
+        }
+      }
+    });
+  }
+});
+</script>
 
 </body>
 </html>
