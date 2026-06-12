@@ -134,6 +134,16 @@
       <div class="flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-3 py-1.5">
         <span class="text-xs text-indigo-300 font-bold">{{.AdminRole}}</span>
       </div>
+      <!-- Export Excel Button -->
+      <a id="btn-export"
+         href="/admin/participants/export{{if or .Filter .Search}}?{{end}}{{if .Filter}}status={{.Filter}}{{end}}{{if and .Filter .Search}}&{{end}}{{if .Search}}q={{.Search}}{{end}}"
+         title="Export ke Excel"
+         class="flex items-center gap-2 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 font-semibold py-1.5 px-3 rounded-xl text-sm transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+        </svg>
+        Export Excel
+      </a>
     </div>
   </div>
 
@@ -185,33 +195,27 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>No. Reg</th>
+              <th>No. Registrasi</th>
               <th>Nama Lengkap</th>
-              <th>Email / WhatsApp</th>
-              <th>Perusahaan</th>
-              <th>Kawasan Industri</th>
-              <th>Tgl Daftar</th>
+              <th>Nama Perusahaan</th>
+              <th>WhatsApp</th>
               <th>Status</th>
-              <th></th>
+              <th>Tanggal Pendaftaran</th>
+              <th class="text-right">Aksi</th>
             </tr>
           </thead>
           <tbody>
             {{range .Participants}}
             <tr onclick="window.location.href='/admin/participants/{{.ID}}'">
               <td class="font-mono text-indigo-300 text-xs whitespace-nowrap">{{.RegistrationNumber}}</td>
-              <td>
-                <div class="font-semibold text-white">{{.FullName}}</div>
+              <td class="font-semibold text-white">
+                <div>{{.FullName}}</div>
                 {{if .JobTitle}}
-                <div class="text-xs text-white/35 mt-0.5">{{.JobTitle | defaultStr "-"}}</div>
+                <div class="text-[10px] text-white/35 font-normal mt-0.5">{{.JobTitle}}</div>
                 {{end}}
               </td>
-              <td>
-                <div class="text-white/70 text-sm">{{.Email | truncate 28}}</div>
-                <div class="text-white/40 text-xs mt-0.5">{{.Phone}}</div>
-              </td>
-              <td class="text-white/70">{{.CompanyName | truncate 25}}</td>
-              <td class="text-white/50 text-sm">{{.IndustrialEstate | truncate 22}}</td>
-              <td class="text-white/45 text-xs whitespace-nowrap">{{.CreatedAt | formatDateTime}}</td>
+              <td class="text-white/70">{{.CompanyName}}</td>
+              <td class="text-white/60 font-mono text-sm">{{.Phone}}</td>
               <td>
                 {{$s := .Status | printf "%s"}}
                 {{if isEq $s "VERIFIED"}}
@@ -221,7 +225,7 @@
                 </span>
                 {{else if isEq $s "REJECTED"}}
                 <span class="badge badge-rejected">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                   Ditolak
                 </span>
                 {{else}}
@@ -231,10 +235,11 @@
                 </span>
                 {{end}}
               </td>
-              <td onclick="event.stopPropagation()">
+              <td class="text-white/45 text-xs whitespace-nowrap">{{.CreatedAt | formatDateTime}}</td>
+              <td class="text-right" onclick="event.stopPropagation()">
                 <a href="/admin/participants/{{.ID}}"
-                   class="text-xs text-indigo-400 hover:text-indigo-300 font-bold whitespace-nowrap transition-colors">
-                  Detail →
+                   class="text-xs bg-indigo-500/10 border border-indigo-500/30 hover:border-indigo-500/60 text-indigo-300 font-bold px-3 py-1.5 rounded-lg transition-all">
+                  Detail
                 </a>
               </td>
             </tr>
@@ -243,11 +248,52 @@
         </table>
       </div>
 
-      <!-- Table footer -->
-      <div class="px-5 py-3 border-t border-white/6 text-xs text-white/30 font-medium">
-        Menampilkan {{len .Participants}} data
-        {{if .Filter}}· filter: <span class="text-white/50">{{.Filter}}</span>{{end}}
-        {{if .Search}}· pencarian: <span class="text-white/50">"{{.Search}}"</span>{{end}}
+      <!-- Table footer / Pagination -->
+      <div class="px-5 py-4 border-t border-white/6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/30 font-medium">
+        <div>
+          Menampilkan <span class="text-white/50">{{len .Participants}}</span> dari <span class="text-white/50">{{.TotalItems}}</span> peserta
+          {{if .Filter}}· filter: <span class="text-white/50">{{.Filter}}</span>{{end}}
+          {{if .Search}}· pencarian: <span class="text-white/50">"{{.Search}}"</span>{{end}}
+        </div>
+        
+        {{if gt .TotalPages 1}}
+        <div class="flex items-center gap-1.5">
+          <!-- Previous Button -->
+          {{if .HasPrev}}
+          <a href="/admin/participants?page={{.PrevPage}}{{if .Filter}}&status={{.Filter}}{{end}}{{if .Search}}&q={{.Search}}{{end}}"
+             class="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/8 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          </a>
+          {{else}}
+          <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-white/2 text-white/10 border border-white/4 cursor-not-allowed">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          </span>
+          {{end}}
+
+          <!-- Pages Buttons -->
+          {{$currPage := .Page}}
+          {{$filter := .Filter}}
+          {{$search := .Search}}
+          {{range .Pages}}
+          <a href="/admin/participants?page={{.}}{{if $filter}}&status={{$filter}}{{end}}{{if $search}}&q={{$search}}{{end}}"
+             class="flex items-center justify-center w-8 h-8 rounded-lg border transition-all {{if eq . $currPage}}bg-indigo-600/25 border-indigo-500/50 text-indigo-300 font-bold{{else}}bg-white/5 border-white/8 text-white/60 hover:bg-white/10 hover:text-white{{end}}">
+            {{.}}
+          </a>
+          {{end}}
+
+          <!-- Next Button -->
+          {{if .HasNext}}
+          <a href="/admin/participants?page={{.NextPage}}{{if .Filter}}&status={{.Filter}}{{end}}{{if .Search}}&q={{.Search}}{{end}}"
+             class="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/8 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </a>
+          {{else}}
+          <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-white/2 text-white/10 border border-white/4 cursor-not-allowed">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </span>
+          {{end}}
+        </div>
+        {{end}}
       </div>
     </div>
     {{else}}

@@ -3,6 +3,7 @@ package routes
 import (
 	"log"
 
+	"github.com/gatherhub/backend/internal/config"
 	"github.com/gatherhub/backend/internal/handlers"
 	"github.com/gatherhub/backend/internal/middleware"
 	"github.com/gatherhub/backend/internal/services"
@@ -11,18 +12,19 @@ import (
 	"gorm.io/gorm"
 )
 
-// Register sets up all application routes
-func Register(app *fiber.App, db *gorm.DB, paymentUploadDir, eventsUploadDir, adminUsername, adminPassword string, store *session.Store) {
-	// ── Services ──────────────────────────────────────────
+// Register sets up all application routes.
+// storage holds the resolved paths for all upload directories.
+func Register(app *fiber.App, db *gorm.DB, storage *config.StorageConfig, adminUsername, adminPassword string, store *session.Store) {
+	// ── Services ──────────────────────────────────────────────
 	eventService := services.NewEventService(db)
-	participantService := services.NewParticipantService(db, paymentUploadDir)
+	participantService := services.NewParticipantService(db, storage.Payments)
 
 	adminService := services.NewAdminService(db)
 	if err := adminService.SeedDefaultAdmin(); err != nil {
 		log.Printf("Warning: failed to seed default admin: %v", err)
 	}
 
-	// ── Handlers ──────────────────────────────────────────
+	// ── Handlers ──────────────────────────────────────────────
 	healthHandler := handlers.NewHealthHandler(db)
 
 	pageHandler, err := handlers.NewPageHandler(eventService, participantService)
@@ -30,31 +32,23 @@ func Register(app *fiber.App, db *gorm.DB, paymentUploadDir, eventsUploadDir, ad
 		log.Fatalf("Failed to initialise page handler: %v", err)
 	}
 
-	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, paymentUploadDir, eventsUploadDir)
+	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storage.Payments, storage.Events)
 	if err != nil {
 		log.Fatalf("Failed to initialise admin handler: %v", err)
 	}
 
-	// ── Public Page Routes (SSR) ───────────────────────────
-	// Landing page — shows event details with "Daftar Sekarang" CTA
+	// ── Public Page Routes (SSR) ───────────────────────────────
 	app.Get("/", pageHandler.Landing)
-
-	// Registration form — shows payment info + form
 	app.Get("/register", pageHandler.RegisterPage)
-
-	// Registration submit — saves participant, redirects to success
 	app.Post("/register", pageHandler.RegisterSubmit)
-
-	// Success page — shows registration number + status
 	app.Get("/register/success", pageHandler.Success)
 
-	// ── Infrastructure ────────────────────────────────────
+	// ── Infrastructure ────────────────────────────────────────
 	app.Get("/health", healthHandler.Health)
 
-	// ── JSON API (v1) ─────────────────────────────────────
+	// ── JSON API (v1) ─────────────────────────────────────────
 	api := app.Group("/api/v1")
 
-	// Event handlers (JSON)
 	eventHandler := handlers.NewEventHandler(eventService)
 	api.Get("/events", eventHandler.List)
 	api.Get("/events/:id", eventHandler.GetByID)
@@ -64,7 +58,7 @@ func Register(app *fiber.App, db *gorm.DB, paymentUploadDir, eventsUploadDir, ad
 	fragments.Get("/events", eventHandler.ListFragment)
 	fragments.Get("/events/:id", eventHandler.GetFragment)
 
-	// ── Admin Routes ──────────────────────────────────────
+	// ── Admin Routes ──────────────────────────────────────────
 	app.Get("/admin/login", adminHandler.LoginPage)
 	app.Post("/admin/login", adminHandler.LoginSubmit)
 	app.Get("/admin/logout", adminHandler.Logout)
@@ -72,6 +66,7 @@ func Register(app *fiber.App, db *gorm.DB, paymentUploadDir, eventsUploadDir, ad
 	admin := app.Group("/admin", middleware.AdminAuth(store))
 	admin.Get("/dashboard", adminHandler.Dashboard)
 	admin.Get("/participants", adminHandler.ParticipantList)
+	admin.Get("/participants/export", adminHandler.ExportParticipants)
 	admin.Get("/participants/:id", adminHandler.ParticipantDetail)
 	admin.Post("/participants/:id/status", adminHandler.UpdateStatus)
 
@@ -102,7 +97,7 @@ func Register(app *fiber.App, db *gorm.DB, paymentUploadDir, eventsUploadDir, ad
 		return c.Redirect("/admin/dashboard", fiber.StatusSeeOther)
 	})
 
-	// ── 404 Fallback ──────────────────────────────────────
+	// ── 404 Fallback ──────────────────────────────────────────
 	app.Use(func(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "Route not found",

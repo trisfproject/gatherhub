@@ -158,34 +158,35 @@
               <div class="flex gap-3 flex-wrap">
                 {{$status := .Participant.Status | printf "%s"}}
                 {{$id := .Participant.ID}}
+                {{$name := .Participant.FullName}}
                 {{if isEq $status "PENDING"}}
-                <button hx-post="/admin/participants/{{$id}}/status" hx-vals='{"status":"VERIFIED"}' hx-target="#status-section" hx-swap="innerHTML" hx-confirm="Verifikasi pendaftaran {{.Participant.FullName}}?"
-                  class="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
+                <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'VERIFIED', 'Apakah Anda yakin ingin memverifikasi pendaftaran {{$name}}?', 'VERIFIED')"
+                  class="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                   Verifikasi
                 </button>
-                <button hx-post="/admin/participants/{{$id}}/status" hx-vals='{"status":"REJECTED"}' hx-target="#status-section" hx-swap="innerHTML" hx-confirm="Tolak pendaftaran {{.Participant.FullName}}?"
-                  class="flex items-center justify-center gap-2 bg-red-700 hover:bg-red-600 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
+                <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'REJECTED', 'Apakah Anda yakin ingin menolak pendaftaran {{$name}}?', 'REJECTED')"
+                  class="flex-1 flex items-center justify-center gap-2 bg-red-700 hover:bg-red-600 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                   Tolak
                 </button>
                 {{else if isEq $status "VERIFIED"}}
-                <button hx-post="/admin/participants/{{$id}}/status" hx-vals='{"status":"REJECTED"}' hx-target="#status-section" hx-swap="innerHTML" hx-confirm="Ubah ke Ditolak?"
-                  class="flex items-center justify-center gap-2 bg-red-700 hover:bg-red-600 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
+                <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'REJECTED', 'Apakah Anda yakin ingin menolak pendaftaran {{$name}}?', 'REJECTED')"
+                  class="flex-1 flex items-center justify-center gap-2 bg-red-700 hover:bg-red-600 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
                   Ubah ke Ditolak
                 </button>
-                <button hx-post="/admin/participants/{{$id}}/status" hx-vals='{"status":"PENDING"}' hx-target="#status-section" hx-swap="innerHTML" hx-confirm="Kembalikan ke Pending?"
-                  class="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
+                <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'PENDING', 'Apakah Anda yakin ingin mengembalikan pendaftaran {{$name}} ke status Pending?', 'PENDING')"
+                  class="flex-1 flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
                   Kembalikan ke Pending
                 </button>
                 {{else}}
-                <button hx-post="/admin/participants/{{$id}}/status" hx-vals='{"status":"VERIFIED"}' hx-target="#status-section" hx-swap="innerHTML" hx-confirm="Verifikasi pendaftaran ini?"
-                  class="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
+                <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'VERIFIED', 'Apakah Anda yakin ingin memverifikasi pendaftaran {{$name}}?', 'VERIFIED')"
+                  class="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                   Verifikasi
                 </button>
-                <button hx-post="/admin/participants/{{$id}}/status" hx-vals='{"status":"PENDING"}' hx-target="#status-section" hx-swap="innerHTML" hx-confirm="Kembalikan ke Pending?"
-                  class="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
+                <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'PENDING', 'Apakah Anda yakin ingin mengembalikan pendaftaran {{$name}} ke status Pending?', 'PENDING')"
+                  class="flex-1 flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
                   Kembalikan ke Pending
                 </button>
                 {{end}}
@@ -261,6 +262,46 @@
           </div>
         </div>
 
+        <!-- Verification History (HTMX target) -->
+        <div id="history-card" class="mt-5">
+          <div class="glass p-6 fade-up" style="animation-delay: .15s">
+            <p class="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-4">Riwayat Verifikasi</p>
+            <div class="space-y-4">
+              {{if .Participant.VerifiedAt}}
+              <div class="flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
+                <div class="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 text-emerald-400">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <div>
+                  <p class="text-sm font-bold text-emerald-300">Pendaftaran Diverifikasi & Disetujui</p>
+                  <p class="text-xs text-white/45 mt-1">Diproses pada: {{formatPtrDateTime .Participant.VerifiedAt}} WIB</p>
+                </div>
+              </div>
+              {{else if .Participant.RejectedAt}}
+              <div class="flex items-start gap-3 bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                <div class="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0 text-red-400">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </div>
+                <div>
+                  <p class="text-sm font-bold text-red-300">Pendaftaran Ditolak</p>
+                  <p class="text-xs text-white/45 mt-1">Diproses pada: {{formatPtrDateTime .Participant.RejectedAt}} WIB</p>
+                </div>
+              </div>
+              {{else}}
+              <div class="flex items-start gap-3 bg-white/3 border border-white/8 rounded-xl p-4">
+                <div class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0 text-white/30">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                  <p class="text-sm font-bold text-white/60">Menunggu Verifikasi (Pending)</p>
+                  <p class="text-xs text-white/30 mt-1">Pendaftar baru masuk ke sistem dan belum diproses.</p>
+                </div>
+              </div>
+              {{end}}
+            </div>
+          </div>
+        </div>
+
       </div><!-- /left col -->
 
       <!-- ─── RIGHT: Payment Proof ─── -->
@@ -329,7 +370,97 @@
 </div><!-- /main-content -->
 </div><!-- /flex -->
 
+<!-- Custom Confirmation Modal -->
+<div id="confirm-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300">
+  <div class="glass max-w-md w-full p-6 scale-95 transform transition-all duration-300 flex flex-col gap-4 text-center">
+    <!-- Icon Container -->
+    <div id="modal-icon" class="w-16 h-16 rounded-full mx-auto flex items-center justify-center">
+      <!-- Icon will be dynamically injected -->
+    </div>
+    
+    <!-- Title -->
+    <h3 id="modal-title" class="text-lg font-bold text-white">Konfirmasi Tindakan</h3>
+    
+    <!-- Message -->
+    <p id="modal-message" class="text-sm text-white/70 leading-relaxed"></p>
+    
+    <!-- Actions -->
+    <div class="flex gap-3 mt-2">
+      <button onclick="closeModal()" class="flex-1 py-2.5 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-semibold transition-colors">
+        Batal
+      </button>
+      <button id="modal-confirm-btn" onclick="submitAction()" class="flex-1 py-2.5 px-4 rounded-xl text-sm font-bold text-white transition-colors">
+        Ya, Lanjutkan
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
+let currentActionUrl = '';
+let currentActionStatus = '';
+
+function confirmAction(url, status, message, actionType) {
+  currentActionUrl = url;
+  currentActionStatus = status;
+  
+  const modal = document.getElementById('confirm-modal');
+  const modalMessage = document.getElementById('modal-message');
+  const modalIcon = document.getElementById('modal-icon');
+  const confirmBtn = document.getElementById('modal-confirm-btn');
+  const modalContainer = modal.querySelector('.glass');
+  
+  modalMessage.textContent = message;
+  
+  // Reset classes
+  modalIcon.className = "w-16 h-16 rounded-full mx-auto flex items-center justify-center";
+  confirmBtn.className = "flex-1 py-2.5 px-4 rounded-xl text-sm font-bold text-white transition-colors";
+  
+  // Style according to actionType
+  if (actionType === 'VERIFIED') {
+    modalIcon.classList.add('bg-emerald-500/20', 'text-emerald-400');
+    modalIcon.innerHTML = `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>`;
+    confirmBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
+  } else if (actionType === 'REJECTED') {
+    modalIcon.classList.add('bg-red-500/20', 'text-red-400');
+    modalIcon.innerHTML = `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
+    confirmBtn.classList.add('bg-red-600', 'hover:bg-red-500');
+  } else {
+    // PENDING or other
+    modalIcon.classList.add('bg-amber-500/20', 'text-amber-400');
+    modalIcon.innerHTML = `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+    confirmBtn.classList.add('bg-amber-600', 'hover:bg-amber-500');
+  }
+  
+  // Show modal
+  modal.classList.remove('opacity-0', 'pointer-events-none');
+  modal.classList.add('opacity-100', 'pointer-events-auto');
+  modalContainer.classList.remove('scale-95');
+  modalContainer.classList.add('scale-100');
+}
+
+function closeModal() {
+  const modal = document.getElementById('confirm-modal');
+  const modalContainer = modal.querySelector('.glass');
+  
+  modal.classList.remove('opacity-100', 'pointer-events-auto');
+  modal.classList.add('opacity-0', 'pointer-events-none');
+  modalContainer.classList.remove('scale-100');
+  modalContainer.classList.add('scale-95');
+}
+
+function submitAction() {
+  closeModal();
+  
+  if (currentActionUrl) {
+    htmx.ajax('POST', currentActionUrl, {
+      values: { status: currentActionStatus },
+      target: '#status-section',
+      swap: 'innerHTML'
+    });
+  }
+}
+
 // Re-process HTMX after status swap (for newly rendered buttons)
 document.body.addEventListener('htmx:afterSwap', function(e){
   if(e.detail.target.id === 'status-section'){

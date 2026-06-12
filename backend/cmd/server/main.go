@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"os"
 	"time"
 
 	"github.com/gatherhub/backend/internal/config"
@@ -17,41 +16,46 @@ import (
 )
 
 func main() {
-	// Load configuration
+	// ── Load configuration ────────────────────────────────────
 	cfg := config.Load()
 
-	// Ensure storage directories exist
-	for _, dir := range []string{cfg.UploadDir, cfg.PaymentUploadDir, cfg.EventsUploadDir} {
-		if err := os.MkdirAll(dir, 0777); err != nil {
-			log.Printf("Warning: could not create directory %s: %v", dir, err)
-		}
+	// ── Initialize storage ────────────────────────────────────
+	// All runtime uploads live under STORAGE_PATH, outside the Git repository.
+	storage := config.NewStorageConfig(cfg.StoragePath)
+
+	if err := storage.Init(); err != nil {
+		log.Fatalf("Failed to initialize storage directories: %v", err)
 	}
 
-	// Connect to database
+	// Warn if the legacy in-repo storage directory still exists.
+	// The legacy path is two levels up from the backend binary: ../../storage
+	storage.CheckLegacy("../")
+
+	// ── Connect to database ───────────────────────────────────
 	db, err := database.Connect(cfg)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Run auto migrations
+	// ── Run auto migrations ───────────────────────────────────
 	if err := database.AutoMigrate(db); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
-	// Seed sample event if the events table is empty
+	// ── Seed sample event if events table is empty ────────────
 	eventService := services.NewEventService(db)
 	if err := eventService.SeedSampleIfEmpty(); err != nil {
 		log.Printf("Warning: could not seed sample event: %v", err)
 	}
 
-	// Initialize Fiber app
+	// ── Initialize Fiber app ──────────────────────────────────
 	app := fiber.New(fiber.Config{
 		AppName:     "GatherHub v1.0",
 		BodyLimit:   11 * 1024 * 1024, // 11 MB — accommodates 10 MB file + form fields
 		ProxyHeader: fiber.HeaderXForwardedFor,
 	})
 
-	// Global middleware
+	// ── Global middleware ─────────────────────────────────────
 	app.Use(recover.New())
 	app.Use(logger.New(logger.Config{
 		Format: "[${time}] ${status} ${method} ${path} (${latency})\n",
@@ -62,19 +66,19 @@ func main() {
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
 
-	// Serve uploaded payment proofs at /payments/*
-	app.Static("/payments", cfg.PaymentUploadDir, fiber.Static{
+	// ── Serve uploaded files as static assets ─────────────────
+	// Payment proofs → /payments/*
+	app.Static("/payments", storage.Payments, fiber.Static{
+		MaxAge:   86400,
+		Compress: false,
+	})
+	// Event banners → /events/*
+	app.Static("/events", storage.Events, fiber.Static{
 		MaxAge:   86400,
 		Compress: false,
 	})
 
-	// Serve uploaded event banners at /events/*
-	app.Static("/events", cfg.EventsUploadDir, fiber.Static{
-		MaxAge:   86400,
-		Compress: false,
-	})
-
-	// Initialize session store
+	// ── Initialize session store ──────────────────────────────
 	store := session.New(session.Config{
 		Expiration:     8 * time.Hour,
 		CookieHTTPOnly: true,
@@ -82,10 +86,10 @@ func main() {
 		CookieSameSite: "Lax",
 	})
 
-	// Register all page and API routes
-	routes.Register(app, db, cfg.PaymentUploadDir, cfg.EventsUploadDir, cfg.AdminUsername, cfg.AdminPassword, store)
+	// ── Register all routes ───────────────────────────────────
+	routes.Register(app, db, storage, cfg.AdminUsername, cfg.AdminPassword, store)
 
-	// Start server
+	// ── Start server ──────────────────────────────────────────
 	addr := ":" + cfg.AppPort
 	log.Printf("✓ GatherHub running on http://localhost%s", addr)
 	if err := app.Listen(addr); err != nil {

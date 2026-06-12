@@ -28,6 +28,8 @@ type Participant struct {
 	JobTitle           *string           `json:"job_title" gorm:"size:255"`
 	PaymentProof       string            `json:"payment_proof" gorm:"size:500"`
 	Status             ParticipantStatus `json:"status" gorm:"not null;default:PENDING;size:20"`
+	VerifiedAt         *time.Time        `json:"verified_at,omitempty"`
+	RejectedAt         *time.Time        `json:"rejected_at,omitempty"`
 	CreatedAt          time.Time         `json:"created_at"`
 	UpdatedAt          time.Time         `json:"updated_at"`
 

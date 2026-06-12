@@ -1,29 +1,44 @@
-# Binaries
+# ── Binaries ──────────────────────────────────────────────────
 backend/gatherhub
 backend/*.exe
 
-# Environment
+# ── Environment ───────────────────────────────────────────────
 .env
 backend/.env
 
-# Uploads (runtime files, not source)
-storage/uploads/*
-!storage/uploads/.gitkeep
-backend/uploads/*
+# ── Runtime storage (must live OUTSIDE the repository) ────────
+# Legacy in-repo paths — prevent accidental commit of uploads
+storage/
+storage/uploads/
+storage/payments/
+storage/events/
+storage/temp/
+# Keep placeholder markers if any exist
+!storage/**/.gitkeep
+
+# Also guard against any uploads accidentally placed inside backend/
+backend/uploads/
 !backend/uploads/.gitkeep
 
-# Go build cache
+# External storage root (sibling directory, not inside repo)
+# gatherhub-storage/ lives at the same level as gatherhub/
+# Nothing from there should ever end up here, but guard just in case:
+payments/
+events/
+temp/
+
+# ── Go build cache ────────────────────────────────────────────
 backend/vendor/
 
-# IDE
+# ── IDE ───────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# OS
+# ── OS ────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# Logs
+# ── Logs ──────────────────────────────────────────────────────
 *.log

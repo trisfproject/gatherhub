@@ -16,6 +16,7 @@ import (
 	templ "github.com/gatherhub/backend/internal/templates"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/session"
+	"github.com/xuri/excelize/v2"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -41,6 +42,14 @@ type AdminParticipantsData struct {
 	Filter       string
 	Search       string
 	Event        *models.Event
+	Page         int
+	TotalPages   int
+	TotalItems   int64
+	HasPrev      bool
+	HasNext      bool
+	PrevPage     int
+	NextPage     int
+	Pages        []int
 }
 
 type AdminParticipantDetailData struct {
@@ -249,10 +258,31 @@ func (h *AdminHandler) Dashboard(c *fiber.Ctx) error {
 func (h *AdminHandler) ParticipantList(c *fiber.Ctx) error {
 	filter := c.Query("status")
 	search := strings.TrimSpace(c.Query("q"))
+	page := c.QueryInt("page", 1)
+	if page <= 0 {
+		page = 1
+	}
+	limit := 10
 
-	participants, err := h.participantService.GetAllForAdmin(filter, search)
+	participants, totalItems, err := h.participantService.GetPaginatedForAdmin(filter, search, page, limit)
 	if err != nil {
 		participants = []models.Participant{}
+		totalItems = 0
+	}
+
+	totalPages := int((totalItems + int64(limit) - 1) / int64(limit))
+	if totalPages <= 0 {
+		totalPages = 1
+	}
+
+	hasPrev := page > 1
+	hasNext := page < totalPages
+	prevPage := page - 1
+	nextPage := page + 1
+
+	var pages []int
+	for i := 1; i <= totalPages; i++ {
+		pages = append(pages, i)
 	}
 
 	stats, _ := h.participantService.GetStats()
@@ -268,6 +298,14 @@ func (h *AdminHandler) ParticipantList(c *fiber.Ctx) error {
 		Filter:       filter,
 		Search:       search,
 		Event:        event,
+		Page:         page,
+		TotalPages:   totalPages,
+		TotalItems:   totalItems,
+		HasPrev:      hasPrev,
+		HasNext:      hasNext,
+		PrevPage:     prevPage,
+		NextPage:     nextPage,
+		Pages:        pages,
 	})
 }
 
@@ -314,7 +352,7 @@ func (h *AdminHandler) UpdateStatus(c *fiber.Ctx) error {
 	rawStatus := strings.ToUpper(strings.TrimSpace(c.FormValue("status")))
 	status := models.ParticipantStatus(rawStatus)
 
-	_, err = h.participantService.UpdateStatus(uint(id), status)
+	p, err := h.participantService.UpdateStatus(uint(id), status)
 	if err != nil {
 		if c.Get("HX-Request") == "true" {
 			return c.Status(fiber.StatusBadRequest).SendString(
@@ -325,16 +363,159 @@ func (h *AdminHandler) UpdateStatus(c *fiber.Ctx) error {
 
 	// HTMX: return updated status badge + action buttons fragment
 	if c.Get("HX-Request") == "true" {
-		newStatus := models.ParticipantStatus(rawStatus)
 		c.Set("HX-Trigger", "statusUpdated")
 		c.Set("Content-Type", "text/html; charset=utf-8")
-		return c.SendString(buildStatusFragment(uint(id), newStatus))
+		return c.SendString(buildStatusFragment(p))
 	}
 
 	return c.Redirect(fmt.Sprintf("/admin/participants/%d", id), fiber.StatusSeeOther)
 }
+// ExportParticipants handles GET /admin/participants/export
+// Generates and streams a .xlsx file of all participants (respects status/search filters).
+func (h *AdminHandler) ExportParticipants(c *fiber.Ctx) error {
+	statusFilter := strings.ToUpper(strings.TrimSpace(c.Query("status")))
+	search := strings.TrimSpace(c.Query("q"))
 
-// EventList handles GET /admin/events
+	// Fetch all matching participants (no pagination)
+	participants, err := h.participantService.GetAllForAdmin(statusFilter, search)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Gagal mengambil data peserta")
+	}
+
+	// Determine event slug for filename
+	eventSlug := "event"
+	if event, err := h.eventService.GetFirst(); err == nil && event != nil {
+		eventSlug = event.Slug
+	}
+
+	// Build XLSX
+	f := excelize.NewFile()
+	defer f.Close()
+
+	sheet := "Peserta"
+	f.SetSheetName("Sheet1", sheet)
+
+	// ── Header style ──────────────────────────────────────────
+	headerStyle, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{Bold: true, Color: "FFFFFF", Size: 11},
+		Fill: excelize.Fill{Type: "pattern", Color: []string{"4F46E5"}, Pattern: 1},
+		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true},
+		Border: []excelize.Border{
+			{Type: "left", Color: "CCCCCC", Style: 1},
+			{Type: "right", Color: "CCCCCC", Style: 1},
+			{Type: "top", Color: "CCCCCC", Style: 1},
+			{Type: "bottom", Color: "CCCCCC", Style: 1},
+		},
+	})
+
+	// ── Data style ────────────────────────────────────────────
+	dataStyle, _ := f.NewStyle(&excelize.Style{
+		Font:      &excelize.Font{Size: 10},
+		Alignment: &excelize.Alignment{Vertical: "center", WrapText: false},
+		Border: []excelize.Border{
+			{Type: "left", Color: "E5E7EB", Style: 1},
+			{Type: "right", Color: "E5E7EB", Style: 1},
+			{Type: "bottom", Color: "E5E7EB", Style: 1},
+		},
+	})
+
+	// ── Headers ───────────────────────────────────────────────
+	headers := []struct {
+		col   string
+		label string
+		width float64
+	}{
+		{"A", "No. Registrasi", 18},
+		{"B", "Nama Lengkap", 28},
+		{"C", "WhatsApp", 18},
+		{"D", "Email", 30},
+		{"E", "Kota", 16},
+		{"F", "Nama Perusahaan", 28},
+		{"G", "Kawasan Industri", 24},
+		{"H", "Username Telegram", 20},
+		{"I", "Jabatan", 20},
+		{"J", "Status", 14},
+		{"K", "Tanggal Daftar", 20},
+	}
+
+	for _, h := range headers {
+		cell := h.col + "1"
+		f.SetCellValue(sheet, cell, h.label)
+		f.SetCellStyle(sheet, cell, cell, headerStyle)
+		f.SetColWidth(sheet, h.col, h.col, h.width)
+	}
+	f.SetRowHeight(sheet, 1, 22)
+
+	// ── Rows ──────────────────────────────────────────────────
+	for i, p := range participants {
+		row := i + 2
+		rowStr := strconv.Itoa(row)
+
+		jobTitle := ""
+		if p.JobTitle != nil {
+			jobTitle = *p.JobTitle
+		}
+
+		statusLabel := string(p.Status)
+		switch p.Status {
+		case models.StatusVerified:
+			statusLabel = "TERVERIFIKASI"
+		case models.StatusRejected:
+			statusLabel = "DITOLAK"
+		case models.StatusPending:
+			statusLabel = "MENUNGGU"
+		}
+
+		values := []interface{}{
+			p.RegistrationNumber,
+			p.FullName,
+			p.Phone,
+			p.Email,
+			p.City,
+			p.CompanyName,
+			p.IndustrialEstate,
+			p.TelegramUsername,
+			jobTitle,
+			statusLabel,
+			p.CreatedAt.Format("02/01/2006 15:04"),
+		}
+
+		cols := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"}
+		for ci, col := range cols {
+			cell := col + rowStr
+			f.SetCellValue(sheet, cell, values[ci])
+			f.SetCellStyle(sheet, cell, cell, dataStyle)
+		}
+		f.SetRowHeight(sheet, row, 18)
+	}
+
+	// ── Freeze header row ─────────────────────────────────────
+	f.SetPanes(sheet, &excelize.Panes{
+		Freeze:      true,
+		Split:       false,
+		XSplit:      0,
+		YSplit:      1,
+		TopLeftCell: "A2",
+		ActivePane:  "bottomLeft",
+	})
+
+	// ── Auto-filter on header row ─────────────────────────────
+	f.AutoFilter(sheet, "A1:K1", []excelize.AutoFilterOptions{})
+
+	// ── Stream to response ────────────────────────────────────
+	var buf bytes.Buffer
+	if err := f.Write(&buf); err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Gagal membuat file Excel")
+	}
+
+	date := time.Now().Format("2006-01-02")
+	filename := fmt.Sprintf("participants-%s-%s.xlsx", eventSlug, date)
+
+	c.Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	return c.Send(buf.Bytes())
+}
+
 func (h *AdminHandler) EventList(c *fiber.Ctx) error {
 	events, err := h.eventService.GetAll()
 	if err != nil {
@@ -852,49 +1033,94 @@ func (h *AdminHandler) render(c *fiber.Ctx, name string, data any) error {
 }
 
 // buildStatusFragment returns an HTML snippet for HTMX swap after status update
-func buildStatusFragment(id uint, status models.ParticipantStatus) string {
-	badge := statusBadgeHTML(status)
+func buildStatusFragment(p *models.Participant) string {
+	badge := statusBadgeHTML(p.Status)
 	actions := ""
-	switch status {
+	switch p.Status {
 	case models.StatusPending:
 		actions = fmt.Sprintf(`
-<button hx-post="/admin/participants/%d/status" hx-vals='{"status":"VERIFIED"}' hx-target="#status-section" hx-swap="innerHTML" hx-confirm="Verifikasi pendaftaran ini?"
-  class="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-5 rounded-xl text-sm transition-colors">
+<button onclick="confirmAction('/admin/participants/%d/status', 'VERIFIED', 'Apakah Anda yakin ingin memverifikasi pendaftaran %s?', 'VERIFIED')"
+  class="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
   Verifikasi
 </button>
-<button hx-post="/admin/participants/%d/status" hx-vals='{"status":"REJECTED"}' hx-target="#status-section" hx-swap="innerHTML" hx-confirm="Tolak pendaftaran ini?"
-  class="flex-1 flex items-center justify-center gap-2 bg-red-700 hover:bg-red-600 text-white font-bold py-3 px-5 rounded-xl text-sm transition-colors">
+<button onclick="confirmAction('/admin/participants/%d/status', 'REJECTED', 'Apakah Anda yakin ingin menolak pendaftaran %s?', 'REJECTED')"
+  class="flex-1 flex items-center justify-center gap-2 bg-red-700 hover:bg-red-600 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
   Tolak
-</button>`, id, id)
+</button>`, p.ID, p.FullName, p.ID, p.FullName)
 	case models.StatusVerified:
 		actions = fmt.Sprintf(`
-<button hx-post="/admin/participants/%d/status" hx-vals='{"status":"REJECTED"}' hx-target="#status-section" hx-swap="innerHTML" hx-confirm="Ubah ke Ditolak?"
-  class="flex-1 flex items-center justify-center gap-2 bg-red-700 hover:bg-red-600 text-white font-bold py-3 px-5 rounded-xl text-sm transition-colors">
+<button onclick="confirmAction('/admin/participants/%d/status', 'REJECTED', 'Apakah Anda yakin ingin menolak pendaftaran %s?', 'REJECTED')"
+  class="flex-1 flex items-center justify-center gap-2 bg-red-700 hover:bg-red-600 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
   Ubah ke Ditolak
 </button>
-<button hx-post="/admin/participants/%d/status" hx-vals='{"status":"PENDING"}' hx-target="#status-section" hx-swap="innerHTML" hx-confirm="Kembalikan ke Pending?"
-  class="flex-1 flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-5 rounded-xl text-sm transition-colors">
+<button onclick="confirmAction('/admin/participants/%d/status', 'PENDING', 'Apakah Anda yakin ingin mengembalikan pendaftaran %s ke status Pending?', 'PENDING')"
+  class="flex-1 flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
   Kembalikan ke Pending
-</button>`, id, id)
+</button>`, p.ID, p.FullName, p.ID, p.FullName)
 	case models.StatusRejected:
 		actions = fmt.Sprintf(`
-<button hx-post="/admin/participants/%d/status" hx-vals='{"status":"VERIFIED"}' hx-target="#status-section" hx-swap="innerHTML" hx-confirm="Verifikasi pendaftaran ini?"
-  class="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-5 rounded-xl text-sm transition-colors">
+<button onclick="confirmAction('/admin/participants/%d/status', 'VERIFIED', 'Apakah Anda yakin ingin memverifikasi pendaftaran %s?', 'VERIFIED')"
+  class="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
   Verifikasi
 </button>
-<button hx-post="/admin/participants/%d/status" hx-vals='{"status":"PENDING"}' hx-target="#status-section" hx-swap="innerHTML" hx-confirm="Kembalikan ke Pending?"
-  class="flex-1 flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-5 rounded-xl text-sm transition-colors">
+<button onclick="confirmAction('/admin/participants/%d/status', 'PENDING', 'Apakah Anda yakin ingin mengembalikan pendaftaran %s ke status Pending?', 'PENDING')"
+  class="flex-1 flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
   Kembalikan ke Pending
-</button>`, id, id)
+</button>`, p.ID, p.FullName, p.ID, p.FullName)
+	}
+
+	historyHTML := ""
+	if p.VerifiedAt != nil {
+		historyHTML = fmt.Sprintf(`
+<div class="flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
+  <div class="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 text-emerald-400">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+  </div>
+  <div>
+    <p class="text-sm font-bold text-emerald-300">Pendaftaran Diverifikasi & Disetujui</p>
+    <p class="text-xs text-white/45 mt-1">Diproses pada: %s WIB</p>
+  </div>
+</div>`, p.VerifiedAt.Format("02/01/2006 15:04"))
+	} else if p.RejectedAt != nil {
+		historyHTML = fmt.Sprintf(`
+<div class="flex items-start gap-3 bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+  <div class="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0 text-red-400">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+  </div>
+  <div>
+    <p class="text-sm font-bold text-red-300">Pendaftaran Ditolak</p>
+    <p class="text-xs text-white/45 mt-1">Diproses pada: %s WIB</p>
+  </div>
+</div>`, p.RejectedAt.Format("02/01/2006 15:04"))
+	} else {
+		historyHTML = `
+<div class="flex items-start gap-3 bg-white/3 border border-white/8 rounded-xl p-4">
+  <div class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0 text-white/30">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+  </div>
+  <div>
+    <p class="text-sm font-bold text-white/60">Menunggu Verifikasi (Pending)</p>
+    <p class="text-xs text-white/30 mt-1">Pendaftar baru masuk ke sistem dan belum diproses.</p>
+  </div>
+</div>`
 	}
 
 	return fmt.Sprintf(`
 <div class="flex items-center gap-3 mb-4">%s</div>
-<div class="flex gap-3">%s</div>`, badge, actions)
+<div class="flex gap-3">%s</div>
+
+<div id="history-card" hx-swap-oob="true">
+  <div class="glass p-6 fade-up" style="animation-delay: .15s">
+    <p class="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-4">Riwayat Verifikasi</p>
+    <div class="space-y-4">
+      %s
+    </div>
+  </div>
+</div>`, badge, actions, historyHTML)
 }
 
 func statusBadgeHTML(status models.ParticipantStatus) string {
@@ -1272,6 +1498,12 @@ func buildAdminFuncMap() template.FuncMap {
 			return t.Format("15:04")
 		},
 		"formatDateTime": func(t time.Time) string {
+			return t.Format("02/01/2006 15:04")
+		},
+		"formatPtrDateTime": func(t *time.Time) string {
+			if t == nil {
+				return ""
+			}
 			return t.Format("02/01/2006 15:04")
 		},
 		"formatPrice": func(price float64) string {

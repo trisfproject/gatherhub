@@ -225,6 +225,39 @@ func (s *ParticipantService) GetAllForAdmin(statusFilter, search string) ([]mode
 	return participants, nil
 }
 
+// GetPaginatedForAdmin returns a page of participants, the total count, and error
+func (s *ParticipantService) GetPaginatedForAdmin(statusFilter, search string, page, limit int) ([]models.Participant, int64, error) {
+	var participants []models.Participant
+	var total int64
+
+	q := s.db.Model(&models.Participant{})
+
+	if statusFilter != "" {
+		q = q.Where("status = ?", statusFilter)
+	}
+
+	if search != "" {
+		like := "%" + search + "%"
+		q = q.Where(
+			"full_name ILIKE ? OR email ILIKE ? OR company_name ILIKE ? OR registration_number ILIKE ?",
+			like, like, like, like,
+		)
+	}
+
+	if err := q.Session(&gorm.Session{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * limit
+	err := q.Preload("Event").
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&participants).Error
+
+	return participants, total, err
+}
+
 // GetStats returns aggregate participant counts per status
 func (s *ParticipantService) GetStats() (*ParticipantStats, error) {
 	stats := &ParticipantStats{}
@@ -277,6 +310,18 @@ func (s *ParticipantService) UpdateStatus(id uint, status models.ParticipantStat
 	}
 
 	p.Status = status
+	now := time.Now()
+	if status == models.StatusVerified {
+		p.VerifiedAt = &now
+		p.RejectedAt = nil
+	} else if status == models.StatusRejected {
+		p.RejectedAt = &now
+		p.VerifiedAt = nil
+	} else if status == models.StatusPending {
+		p.VerifiedAt = nil
+		p.RejectedAt = nil
+	}
+
 	if err := s.db.Save(&p).Error; err != nil {
 		return nil, fmt.Errorf("failed to update status: %w", err)
 	}
