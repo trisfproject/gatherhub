@@ -275,7 +275,7 @@ func (s *ParticipantService) UpdateStatus(id uint, status models.ParticipantStat
 	}
 
 	var p models.Participant
-	if err := s.db.First(&p, id).Error; err != nil {
+	if err := s.db.Preload("Event").First(&p, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("participant not found")
 		}

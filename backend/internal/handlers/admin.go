@@ -1213,17 +1213,21 @@ func buildStatusFragment(p *models.Participant) string {
 	actions := ""
 	switch p.Status {
 	case models.StatusPending:
+		eventTitle := "acara ini"
+		if p.Event.Title != "" {
+			eventTitle = p.Event.Title
+		}
 		actions = fmt.Sprintf(`
-<button onclick="confirmAction('/admin/participants/%d/status', 'VERIFIED', 'Apakah Anda yakin ingin memverifikasi pendaftaran %s?', 'VERIFIED')"
+<button onclick="confirmAction('/admin/participants/%d/status', 'VERIFIED', 'Apakah Anda yakin ingin memverifikasi pendaftaran %s untuk %s?', 'VERIFIED')"
   class="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
   Verifikasi
 </button>
-<button onclick="confirmAction('/admin/participants/%d/status', 'REJECTED', 'Apakah Anda yakin ingin menolak pendaftaran %s?', 'REJECTED')"
+<button onclick="confirmAction('/admin/participants/%d/status', 'REJECTED', 'Apakah Anda yakin ingin menolak pendaftaran %s untuk %s?', 'REJECTED')"
   class="flex-1 flex items-center justify-center gap-2 bg-red-700 hover:bg-red-600 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
   Tolak
-</button>`, p.ID, p.FullName, p.ID, p.FullName)
+</button>`, p.ID, p.FullName, eventTitle, p.ID, p.FullName, eventTitle)
 	case models.StatusVerified:
 		actions = ""
 	case models.StatusRejected:

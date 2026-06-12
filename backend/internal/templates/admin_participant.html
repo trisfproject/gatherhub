@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Detail Peserta — GatherHub Admin</title>
+  <title>Detail Peserta: {{.Participant.FullName}} — {{if .Event}}{{.Event.Title}}{{else}}GatherHub{{end}} Admin</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2XoQrxeTUQyRjrOnlCoYta87iKBWq3EsdM2" crossorigin="anonymous"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
@@ -159,13 +159,13 @@
                 {{$status := .Participant.Status | printf "%s"}}
                 {{$id := .Participant.ID}}
                 {{$name := .Participant.FullName}}
-                {{if isEq $status "PENDING"}}
-                <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'VERIFIED', 'Apakah Anda yakin ingin memverifikasi pendaftaran {{$name}}?', 'VERIFIED')"
+                 {{if isEq $status "PENDING"}}
+                <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'VERIFIED', 'Apakah Anda yakin ingin memverifikasi pendaftaran {{$name}} untuk {{if $.Event}}{{$.Event.Title}}{{else}}acara ini{{end}}?', 'VERIFIED')"
                   class="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                   Verifikasi
                 </button>
-                <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'REJECTED', 'Apakah Anda yakin ingin menolak pendaftaran {{$name}}?', 'REJECTED')"
+                <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'REJECTED', 'Apakah Anda yakin ingin menolak pendaftaran {{$name}} untuk {{if $.Event}}{{$.Event.Title}}{{else}}acara ini{{end}}?', 'REJECTED')"
                   class="flex-1 flex items-center justify-center gap-2 bg-red-700 hover:bg-red-600 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                   Tolak
