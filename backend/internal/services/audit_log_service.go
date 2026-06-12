@@ -21,13 +21,29 @@ func NewAuditLogService(db *gorm.DB) *AuditLogService {
 
 // Log writes a new log entry to the audit_logs table.
 func (s *AuditLogService) Log(actor, action, resourceType string, resourceID uint, oldValue, newValue interface{}, ip, userAgent string) error {
+	var oldValPtr *string
+	if oldValue != nil {
+		str := toJSONString(oldValue)
+		if str != "" {
+			oldValPtr = &str
+		}
+	}
+
+	var newValPtr *string
+	if newValue != nil {
+		str := toJSONString(newValue)
+		if str != "" {
+			newValPtr = &str
+		}
+	}
+
 	logEntry := models.AuditLog{
 		Actor:        actor,
 		Action:       action,
 		ResourceType: resourceType,
 		ResourceID:   resourceID,
-		OldValue:     toJSONString(oldValue),
-		NewValue:     toJSONString(newValue),
+		OldValue:     oldValPtr,
+		NewValue:     newValPtr,
 		IPAddress:    ip,
 		UserAgent:    userAgent,
 		CreatedAt:    time.Now(),

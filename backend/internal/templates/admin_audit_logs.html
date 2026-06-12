@@ -274,10 +274,10 @@
             <!-- Metadata info -->
             <div class="flex flex-wrap gap-x-6 gap-y-2 text-xs text-white/35 font-medium border-t border-white/5 pt-3">
               <span class="flex items-center gap-1.5">
-                <span class="w-1.5 h-1.5 rounded-full bg-white/20"></span>IP: {{default "Internal" .IPAddress}}
+                <span class="w-1.5 h-1.5 rounded-full bg-white/20"></span>IP: {{defaultStr "Internal" .IPAddress}}
               </span>
               <span class="flex items-center gap-1.5 truncate max-w-lg" title="{{.UserAgent}}">
-                <span class="w-1.5 h-1.5 rounded-full bg-white/20"></span>Browser: {{default "System Engine" .UserAgent}}
+                <span class="w-1.5 h-1.5 rounded-full bg-white/20"></span>Browser: {{defaultStr "System Engine" .UserAgent}}
               </span>
             </div>
 

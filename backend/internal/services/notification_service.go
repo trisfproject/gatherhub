@@ -206,7 +206,9 @@ func (p *MockProvider) Send(recipient, message string) error {
 	}
 
 	if p.auditLogService != nil {
-		_ = p.auditLogService.Log("system", "SENT", "NOTIFICATION", logEntry.ID, nil, logEntry, "", "")
+		if err := p.auditLogService.Log("system", "SENT", "NOTIFICATION", logEntry.ID, nil, logEntry, "", ""); err != nil {
+			log.Printf("Warning: failed to write notification audit log: %v", err)
+		}
 	}
 
 	return nil
