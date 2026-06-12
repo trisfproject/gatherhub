@@ -20,6 +20,11 @@ type Config struct {
 	UploadDir        string
 	PaymentUploadDir string
 	FrontendDir      string
+
+	// Admin credentials (set via env, never hardcoded in production)
+	AdminUsername string
+	AdminPassword string
+	SessionSecret string
 }
 
 // Load reads configuration from environment variables (and .env file if present)
@@ -40,6 +45,10 @@ func Load() *Config {
 		UploadDir:        getEnv("UPLOAD_DIR", "./uploads"),
 		PaymentUploadDir: getEnv("PAYMENT_UPLOAD_DIR", "../storage/payments"),
 		FrontendDir:      getEnv("FRONTEND_DIR", "../frontend"),
+
+		AdminUsername: getEnv("ADMIN_USERNAME", "admin"),
+		AdminPassword: getEnv("ADMIN_PASSWORD", "admin123"),
+		SessionSecret: getEnv("SESSION_SECRET", "gatherhub-secret-change-in-production"),
 	}
 }
 

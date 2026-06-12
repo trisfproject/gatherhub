@@ -50,7 +50,7 @@ func NewPageHandler(
 	participantService *services.ParticipantService,
 ) (*PageHandler, error) {
 	funcMap := buildFuncMap()
-	t, err := template.New("").Funcs(funcMap).ParseFS(templ.Files, "*.html")
+	t, err := template.New("").Funcs(funcMap).ParseFS(templ.Files, "landing.html", "register.html", "success.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse templates: %w", err)
 	}
@@ -315,10 +315,6 @@ func buildFuncMap() template.FuncMap {
 		// formatYear → "2025"
 		"formatYear": func(t time.Time) string {
 			return fmt.Sprintf("%d", t.Year())
-		},
-		// gt helper for float comparison in templates
-		"gt": func(a, b float64) bool {
-			return a > b
 		},
 	}
 }

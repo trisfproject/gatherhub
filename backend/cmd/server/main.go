@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/gatherhub/backend/internal/config"
 	"github.com/gatherhub/backend/internal/database"
@@ -12,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/session"
 )
 
 func main() {
@@ -66,8 +68,16 @@ func main() {
 		Compress: false,
 	})
 
+	// Initialize session store
+	store := session.New(session.Config{
+		Expiration:     8 * time.Hour,
+		CookieHTTPOnly: true,
+		CookieSecure:   cfg.AppEnv == "production",
+		CookieSameSite: "Lax",
+	})
+
 	// Register all page and API routes
-	routes.Register(app, db, cfg.PaymentUploadDir)
+	routes.Register(app, db, cfg.PaymentUploadDir, cfg.AdminUsername, cfg.AdminPassword, store)
 
 	// Start server
 	addr := ":" + cfg.AppPort

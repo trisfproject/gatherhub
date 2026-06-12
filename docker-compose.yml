@@ -39,6 +39,9 @@ services:
       UPLOAD_DIR: /app/storage/uploads
       PAYMENT_UPLOAD_DIR: /app/storage/payments
       FRONTEND_DIR: /app/frontend
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin123
+      SESSION_SECRET: gatherhub-secret-change-in-production
     ports:
       - "3000:3000"
     volumes:

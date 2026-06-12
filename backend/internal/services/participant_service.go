@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -37,11 +38,19 @@ type RegisterForm struct {
 	JobTitle         string `form:"job_title"` // optional
 }
 
+// ParticipantStats holds dashboard counts by status
+type ParticipantStats struct {
+	Total    int64
+	Pending  int64
+	Verified int64
+	Rejected int64
+}
+
 var emailRegex = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 var phoneRegex = regexp.MustCompile(`^(\+62|62|0)[0-9]{8,13}$`)
 
-// Validate performs comprehensive validation on the form
-// Returns a slice of Indonesian-language error messages
+// Validate performs comprehensive validation on the form.
+// Returns a slice of Indonesian-language error messages.
 func (f *RegisterForm) Validate() []string {
 	var errs []string
 
@@ -68,15 +77,12 @@ func (f *RegisterForm) Validate() []string {
 	if strings.TrimSpace(f.City) == "" {
 		errs = append(errs, "Kota wajib diisi")
 	}
-
 	if strings.TrimSpace(f.CompanyName) == "" {
 		errs = append(errs, "Nama Perusahaan wajib diisi")
 	}
-
 	if strings.TrimSpace(f.IndustrialEstate) == "" {
 		errs = append(errs, "Kawasan Industri wajib diisi")
 	}
-
 	if strings.TrimSpace(f.TelegramUsername) == "" {
 		errs = append(errs, "Username Telegram wajib diisi")
 	}
@@ -90,18 +96,15 @@ func ValidateFile(file *multipart.FileHeader) error {
 		return fmt.Errorf("Bukti pembayaran wajib diunggah")
 	}
 
-	// Validate file type
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 	allowed := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".pdf": true}
 	if !allowed[ext] {
 		return fmt.Errorf("Tipe file tidak diizinkan. Gunakan JPG, JPEG, PNG, atau PDF")
 	}
 
-	// Validate file size (max 10MB)
 	if file.Size > 10*1024*1024 {
 		return fmt.Errorf("Ukuran file melebihi batas maksimum 10MB")
 	}
-
 	if file.Size == 0 {
 		return fmt.Errorf("File bukti pembayaran tidak boleh kosong")
 	}
@@ -191,5 +194,92 @@ func (s *ParticipantService) GetByID(id uint) (*models.Participant, error) {
 	if err := s.db.Preload("Event").First(&p, id).Error; err != nil {
 		return nil, err
 	}
+	return &p, nil
+}
+
+// ─────────────────────── Admin Methods ───────────────────────
+
+// GetAllForAdmin returns all participants ordered by created_at desc with their events preloaded.
+// Optional status filter: "", "PENDING", "VERIFIED", "REJECTED"
+// Optional search: partial match on name, email, company, or registration number
+func (s *ParticipantService) GetAllForAdmin(statusFilter, search string) ([]models.Participant, error) {
+	var participants []models.Participant
+
+	q := s.db.Preload("Event").Order("created_at DESC")
+
+	if statusFilter != "" {
+		q = q.Where("status = ?", statusFilter)
+	}
+
+	if search != "" {
+		like := "%" + search + "%"
+		q = q.Where(
+			"full_name ILIKE ? OR email ILIKE ? OR company_name ILIKE ? OR registration_number ILIKE ?",
+			like, like, like, like,
+		)
+	}
+
+	if err := q.Find(&participants).Error; err != nil {
+		return nil, err
+	}
+	return participants, nil
+}
+
+// GetStats returns aggregate participant counts per status
+func (s *ParticipantService) GetStats() (*ParticipantStats, error) {
+	stats := &ParticipantStats{}
+
+	type row struct {
+		Status models.ParticipantStatus
+		Count  int64
+	}
+	var rows []row
+
+	if err := s.db.Model(&models.Participant{}).
+		Select("status, count(*) as count").
+		Group("status").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	for _, r := range rows {
+		stats.Total += r.Count
+		switch r.Status {
+		case models.StatusPending:
+			stats.Pending = r.Count
+		case models.StatusVerified:
+			stats.Verified = r.Count
+		case models.StatusRejected:
+			stats.Rejected = r.Count
+		}
+	}
+
+	return stats, nil
+}
+
+// UpdateStatus changes a participant's status to VERIFIED or REJECTED
+func (s *ParticipantService) UpdateStatus(id uint, status models.ParticipantStatus) (*models.Participant, error) {
+	allowed := map[models.ParticipantStatus]bool{
+		models.StatusVerified: true,
+		models.StatusRejected: true,
+		models.StatusPending:  true,
+	}
+	if !allowed[status] {
+		return nil, fmt.Errorf("invalid status: %s", status)
+	}
+
+	var p models.Participant
+	if err := s.db.First(&p, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("participant not found")
+		}
+		return nil, err
+	}
+
+	p.Status = status
+	if err := s.db.Save(&p).Error; err != nil {
+		return nil, fmt.Errorf("failed to update status: %w", err)
+	}
+
 	return &p, nil
 }

@@ -4,13 +4,15 @@ import (
 	"log"
 
 	"github.com/gatherhub/backend/internal/handlers"
+	"github.com/gatherhub/backend/internal/middleware"
 	"github.com/gatherhub/backend/internal/services"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/session"
 	"gorm.io/gorm"
 )
 
 // Register sets up all application routes
-func Register(app *fiber.App, db *gorm.DB, paymentUploadDir string) {
+func Register(app *fiber.App, db *gorm.DB, paymentUploadDir, adminUsername, adminPassword string, store *session.Store) {
 	// ── Services ──────────────────────────────────────────
 	eventService := services.NewEventService(db)
 	participantService := services.NewParticipantService(db, paymentUploadDir)
@@ -21,6 +23,11 @@ func Register(app *fiber.App, db *gorm.DB, paymentUploadDir string) {
 	pageHandler, err := handlers.NewPageHandler(eventService, participantService)
 	if err != nil {
 		log.Fatalf("Failed to initialise page handler: %v", err)
+	}
+
+	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminUsername, adminPassword, paymentUploadDir)
+	if err != nil {
+		log.Fatalf("Failed to initialise admin handler: %v", err)
 	}
 
 	// ── Public Page Routes (SSR) ───────────────────────────
@@ -51,6 +58,21 @@ func Register(app *fiber.App, db *gorm.DB, paymentUploadDir string) {
 	fragments := app.Group("/fragments")
 	fragments.Get("/events", eventHandler.ListFragment)
 	fragments.Get("/events/:id", eventHandler.GetFragment)
+
+	// ── Admin Routes ──────────────────────────────────────
+	app.Get("/admin/login", adminHandler.LoginPage)
+	app.Post("/admin/login", adminHandler.LoginSubmit)
+	app.Get("/admin/logout", adminHandler.Logout)
+
+	admin := app.Group("/admin", middleware.AdminAuth(store))
+	admin.Get("/dashboard", adminHandler.Dashboard)
+	admin.Get("/participants", adminHandler.ParticipantList)
+	admin.Get("/participants/:id", adminHandler.ParticipantDetail)
+	admin.Post("/participants/:id/status", adminHandler.UpdateStatus)
+
+	app.Get("/admin", func(c *fiber.Ctx) error {
+		return c.Redirect("/admin/dashboard", fiber.StatusSeeOther)
+	})
 
 	// ── 404 Fallback ──────────────────────────────────────
 	app.Use(func(c *fiber.Ctx) error {
