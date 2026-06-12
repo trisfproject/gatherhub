@@ -538,17 +538,17 @@ func (h *AdminHandler) ExportParticipants(c *fiber.Ctx) error {
 		label string
 		width float64
 	}{
-		{"A", "No. Registrasi", 18},
-		{"B", "Nama Lengkap", 28},
+		{"A", "Registration Number", 20},
+		{"B", "Full Name", 28},
 		{"C", "WhatsApp", 18},
 		{"D", "Email", 30},
-		{"E", "Kota", 16},
-		{"F", "Nama Perusahaan", 28},
-		{"G", "Kawasan Industri", 24},
-		{"H", "Username Telegram", 20},
-		{"I", "Jabatan", 20},
+		{"E", "City", 16},
+		{"F", "Company Name", 28},
+		{"G", "Industrial Estate", 24},
+		{"H", "Telegram Username", 20},
+		{"I", "Job Title", 20},
 		{"J", "Status", 14},
-		{"K", "Tanggal Daftar", 20},
+		{"K", "Registration Date", 22},
 	}
 
 	for _, h := range headers {
@@ -572,11 +572,11 @@ func (h *AdminHandler) ExportParticipants(c *fiber.Ctx) error {
 		statusLabel := string(p.Status)
 		switch p.Status {
 		case models.StatusVerified:
-			statusLabel = "TERVERIFIKASI"
+			statusLabel = "VERIFIED"
 		case models.StatusRejected:
-			statusLabel = "DITOLAK"
+			statusLabel = "REJECTED"
 		case models.StatusPending:
-			statusLabel = "MENUNGGU"
+			statusLabel = "PENDING"
 		}
 
 		values := []interface{}{
@@ -621,7 +621,7 @@ func (h *AdminHandler) ExportParticipants(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).SendString("Gagal membuat file Excel")
 	}
 
-	date := time.Now().Format("2006-01-02")
+	date := time.Now().Format("20060102")
 	filename := fmt.Sprintf("participants-%s-%s.xlsx", eventSlug, date)
 
 	c.Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
