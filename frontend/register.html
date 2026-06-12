@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register — GatherHub</title>
+  <meta name="description" content="Register for this event on GatherHub. Fill in your details and upload your payment proof." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2ulaA23f7kvAPTxzMRGl4bFDJ5jLdGJNs" crossorigin="anonymous"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: { brand: { 50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81' } }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .hero-gradient { background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); }
+    .glass-card { background: rgba(255,255,255,0.05); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); }
+    .btn-primary { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); transition: all 0.3s ease; box-shadow: 0 4px 20px rgba(99,102,241,0.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(99,102,241,0.6); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .orb { position:absolute; border-radius:50%; filter:blur(80px); opacity:0.12; }
+    .orb-1 { width:500px; height:500px; background:#6366f1; top:-200px; right:-150px; }
+    .orb-2 { width:350px; height:350px; background:#8b5cf6; bottom:100px; left:-100px; }
+
+    /* Form input styling */
+    .form-input {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: white;
+      border-radius: 0.875rem;
+      padding: 0.75rem 1rem;
+      width: 100%;
+      font-size: 0.875rem;
+      transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+      outline: none;
+    }
+    .form-input::placeholder { color: rgba(255,255,255,0.3); }
+    .form-input:focus {
+      border-color: rgba(99,102,241,0.7);
+      background: rgba(99,102,241,0.08);
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    }
+    .form-input:hover { border-color: rgba(255,255,255,0.25); }
+    .form-label { font-size: 0.8125rem; font-weight: 600; color: rgba(255,255,255,0.75); margin-bottom: 0.375rem; display: block; }
+    .form-label .required { color: #f87171; margin-left: 0.25rem; }
+    .form-label .optional { color: rgba(255,255,255,0.3); font-weight: 400; margin-left: 0.375rem; font-size: 0.75rem; }
+
+    /* File upload */
+    .file-upload-area {
+      border: 2px dashed rgba(255,255,255,0.2);
+      border-radius: 0.875rem;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: rgba(255,255,255,0.02);
+    }
+    .file-upload-area:hover, .file-upload-area.drag-over {
+      border-color: rgba(99,102,241,0.6);
+      background: rgba(99,102,241,0.05);
+    }
+    .file-upload-area.has-file {
+      border-color: rgba(52,211,153,0.5);
+      background: rgba(52,211,153,0.05);
+    }
+
+    /* Spinner */
+    .htmx-indicator { display: none; }
+    .htmx-request .htmx-indicator { display: inline-flex; }
+    @keyframes spin { to { transform: rotate(360deg) } }
+    .animate-spin { animation: spin 1s linear infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+    .animate-pulse { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+
+    /* Section divider */
+    .section-divider {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      margin: 1.5rem 0;
+    }
+  </style>
+</head>
+<body class="hero-gradient min-h-screen text-white">
+
+  <!-- Navigation -->
+  <nav class="fixed top-0 left-0 right-0 z-50 glass-card border-0 border-b border-white/10">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center shadow-lg shadow-brand-500/30">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <span class="text-xl font-bold tracking-tight">GatherHub</span>
+      </a>
+      <a id="back-btn" href="/" class="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Back to Event
+      </a>
+    </div>
+  </nav>
+
+  <main class="relative pt-24 pb-20 overflow-hidden">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="relative z-10 max-w-2xl mx-auto px-6">
+
+      <!-- Header -->
+      <div class="mb-8">
+        <nav class="flex items-center gap-2 text-sm text-white/40 mb-4">
+          <a href="/" class="hover:text-white/70 transition-colors">Home</a>
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+          <a id="breadcrumb-event" href="#" class="hover:text-white/70 transition-colors">Event Details</a>
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+          <span class="text-white/60">Registration</span>
+        </nav>
+
+        <div class="flex items-center gap-3 mb-2">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-2xl font-extrabold">Event Registration</h1>
+            <p id="event-title-display" class="text-white/50 text-sm mt-0.5"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error / Validation messages target -->
+      <div id="form-error-container" class="mb-4"></div>
+
+      <!-- Registration Form Card -->
+      <div class="glass-card rounded-3xl p-8">
+
+        <form id="registration-form"
+              enctype="multipart/form-data"
+              hx-post=""
+              hx-encoding="multipart/form-data"
+              hx-target="#form-error-container"
+              hx-swap="innerHTML"
+              hx-indicator="#submit-indicator">
+
+          <!-- Section: Personal Information -->
+          <div class="mb-6">
+            <h2 class="text-sm font-semibold text-brand-300 uppercase tracking-widest mb-5 flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+              </svg>
+              Personal Information
+            </h2>
+
+            <div class="space-y-4">
+              <div>
+                <label for="full_name" class="form-label">Full Name<span class="required">*</span></label>
+                <input type="text" id="full_name" name="full_name" required
+                       placeholder="e.g. Budi Santoso"
+                       autocomplete="name"
+                       class="form-input" />
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label for="phone" class="form-label">
+                    <span class="flex items-center gap-1.5">
+                      <svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                        <path d="M12 0C5.373 0 0 5.373 0 12c0 2.386.665 4.615 1.815 6.514L0 24l5.65-1.793A11.954 11.954 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0z"/>
+                      </svg>
+                      WhatsApp Number<span class="required">*</span>
+                    </span>
+                  </label>
+                  <input type="tel" id="phone" name="phone" required
+                         placeholder="e.g. 08123456789"
+                         autocomplete="tel"
+                         class="form-input" />
+                </div>
+                <div>
+                  <label for="email" class="form-label">Email Address<span class="required">*</span></label>
+                  <input type="email" id="email" name="email" required
+                         placeholder="name@company.com"
+                         autocomplete="email"
+                         class="form-input" />
+                </div>
+              </div>
+
+              <div>
+                <label for="city" class="form-label">City<span class="required">*</span></label>
+                <input type="text" id="city" name="city" required
+                       placeholder="e.g. Jakarta"
+                       class="form-input" />
+              </div>
+            </div>
+          </div>
+
+          <hr class="section-divider" />
+
+          <!-- Section: Professional Information -->
+          <div class="mb-6">
+            <h2 class="text-sm font-semibold text-purple-300 uppercase tracking-widest mb-5 flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+              </svg>
+              Professional Information
+            </h2>
+
+            <div class="space-y-4">
+              <div>
+                <label for="company_name" class="form-label">Company Name<span class="required">*</span></label>
+                <input type="text" id="company_name" name="company_name" required
+                       placeholder="e.g. PT Teknindo Makmur"
+                       class="form-input" />
+              </div>
+
+              <div>
+                <label for="industrial_estate" class="form-label">Industrial Estate<span class="required">*</span></label>
+                <input type="text" id="industrial_estate" name="industrial_estate" required
+                       placeholder="e.g. Kawasan Industri Jababeka"
+                       class="form-input" />
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label for="telegram_username" class="form-label">Telegram Username<span class="required">*</span></label>
+                  <div class="relative">
+                    <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 text-sm font-medium">@</span>
+                    <input type="text" id="telegram_username" name="telegram_username" required
+                           placeholder="yourusername"
+                           class="form-input pl-8" />
+                  </div>
+                </div>
+                <div>
+                  <label for="job_title" class="form-label">Job Title<span class="optional">(optional)</span></label>
+                  <input type="text" id="job_title" name="job_title"
+                         placeholder="e.g. Maintenance Manager"
+                         class="form-input" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <hr class="section-divider" />
+
+          <!-- Section: Payment Proof -->
+          <div class="mb-8">
+            <h2 class="text-sm font-semibold text-emerald-300 uppercase tracking-widest mb-5 flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+              </svg>
+              Payment Proof
+            </h2>
+
+            <!-- Payment info reminder box -->
+            <div id="payment-info" class="glass-card rounded-2xl p-4 mb-5 hidden">
+              <p class="text-xs text-white/50 font-semibold uppercase tracking-widest mb-2">Transfer to</p>
+              <div id="payment-details" class="text-sm space-y-1"></div>
+            </div>
+
+            <!-- File upload area -->
+            <label for="payment_proof" class="block">
+              <div id="upload-area" class="file-upload-area">
+                <div id="upload-placeholder">
+                  <div class="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-3">
+                    <svg class="w-6 h-6 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                  </div>
+                  <p class="text-white/60 text-sm font-medium">Click to upload or drag & drop</p>
+                  <p class="text-white/30 text-xs mt-1">JPG, PNG, PDF, WEBP · Max 5MB</p>
+                </div>
+                <div id="upload-preview" class="hidden">
+                  <div class="flex items-center gap-3 justify-center">
+                    <svg class="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <div class="text-left">
+                      <p id="file-name" class="text-emerald-300 text-sm font-semibold"></p>
+                      <p id="file-size" class="text-white/40 text-xs"></p>
+                    </div>
+                  </div>
+                  <p class="text-white/30 text-xs mt-3">Click to change file</p>
+                </div>
+              </div>
+              <input type="file" id="payment_proof" name="payment_proof" required
+                     accept=".jpg,.jpeg,.png,.pdf,.webp"
+                     class="sr-only" />
+            </label>
+          </div>
+
+          <!-- Terms notice -->
+          <p class="text-white/30 text-xs text-center mb-6 leading-relaxed">
+            By submitting this form, you agree to allow GatherHub to store your information for event management purposes. Your registration will be reviewed by our admin team.
+          </p>
+
+          <!-- Submit button -->
+          <button type="submit" id="submit-btn"
+                  class="btn-primary w-full flex items-center justify-center gap-3 font-bold px-8 py-4 rounded-2xl text-base text-white">
+            <span id="submit-indicator" class="htmx-indicator">
+              <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+            </span>
+            <span id="submit-text" class="flex items-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+              </svg>
+              Submit Registration
+            </span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Helper text -->
+      <p class="text-center text-white/30 text-xs mt-4">
+        Your registration will be reviewed within 1–2 business days.
+      </p>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-white/10 py-8">
+    <div class="max-w-7xl mx-auto px-6 text-center">
+      <p class="text-white/30 text-sm">© 2025 GatherHub · Modern Event Registration Platform</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const eventId = params.get('event_id');
+      const eventName = params.get('event_name') || '';
+
+      // Set form action and back button
+      if (eventId) {
+        document.getElementById('registration-form').setAttribute('hx-post', `/api/v1/events/${eventId}/register`);
+        htmx.process(document.getElementById('registration-form')); // re-process htmx attributes
+
+        const backBtn = document.getElementById('back-btn');
+        backBtn.href = `/event.html?id=${eventId}`;
+
+        const breadcrumbEvent = document.getElementById('breadcrumb-event');
+        breadcrumbEvent.href = `/event.html?id=${eventId}`;
+
+        // Load event info for payment details
+        fetch(`/api/v1/events/${eventId}`)
+          .then(r => r.json())
+          .then(({ data }) => {
+            if (!data) return;
+
+            // Update page title
+            document.title = `Register: ${data.title} — GatherHub`;
+            document.getElementById('event-title-display').textContent = data.title;
+            breadcrumbEvent.textContent = data.title;
+
+            // Show payment info if event has a price
+            if (data.price > 0) {
+              const price = new Intl.NumberFormat('id-ID', {style:'currency', currency:'IDR', minimumFractionDigits:0}).format(data.price);
+              document.getElementById('payment-details').innerHTML = `
+                <div class="flex justify-between py-0.5">
+                  <span class="text-white/40">Bank</span>
+                  <span class="text-white font-medium">${escHtml(data.payment_bank)}</span>
+                </div>
+                <div class="flex justify-between py-0.5">
+                  <span class="text-white/40">Account</span>
+                  <span class="text-white font-mono font-medium">${escHtml(data.payment_account_number)}</span>
+                </div>
+                <div class="flex justify-between py-0.5">
+                  <span class="text-white/40">Name</span>
+                  <span class="text-white font-medium">${escHtml(data.payment_account_name)}</span>
+                </div>
+                <div class="flex justify-between py-0.5 border-t border-white/10 mt-2 pt-2">
+                  <span class="text-white/40">Amount</span>
+                  <span class="text-emerald-400 font-bold">${escHtml(price)}</span>
+                </div>`;
+              document.getElementById('payment-info').classList.remove('hidden');
+            }
+          })
+          .catch(() => {
+            document.getElementById('event-title-display').textContent = eventName || `Event #${eventId}`;
+          });
+      } else {
+        // No event ID — show an error
+        document.getElementById('form-error-container').innerHTML = `
+          <div class="glass-card border border-red-500/30 bg-red-500/10 rounded-2xl p-4 mb-4 text-center">
+            <p class="text-red-300 font-semibold text-sm">No event selected.</p>
+            <a href="/" class="text-brand-400 text-sm hover:text-brand-300 mt-1 inline-block">← Back to events</a>
+          </div>`;
+        document.getElementById('submit-btn').disabled = true;
+      }
+
+      // File upload preview
+      const fileInput = document.getElementById('payment_proof');
+      const uploadArea = document.getElementById('upload-area');
+
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          showFilePreview(file);
+        }
+      });
+
+      // Drag and drop
+      uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('drag-over');
+      });
+      uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+      uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file) {
+          fileInput.files = e.dataTransfer.files;
+          showFilePreview(file);
+        }
+      });
+
+      function showFilePreview(file) {
+        document.getElementById('file-name').textContent = file.name;
+        document.getElementById('file-size').textContent = formatBytes(file.size);
+        document.getElementById('upload-placeholder').classList.add('hidden');
+        document.getElementById('upload-preview').classList.remove('hidden');
+        uploadArea.classList.add('has-file');
+      }
+
+      function formatBytes(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+      }
+
+      function escHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      }
+    });
+
+    // Scroll to error on HTMX response
+    document.body.addEventListener('htmx:afterSwap', (e) => {
+      if (e.detail.target.id === 'form-error-container') {
+        e.detail.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  </script>
+</body>
+</html>

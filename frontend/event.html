@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Event Details — GatherHub</title>
+  <meta name="description" content="View event details and register on GatherHub." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-ujb1lZYygJmzgSwoxRggbCHcjc0rB2ulaA23f7kvAPTxzMRGl4bFDJ5jLdGJNs" crossorigin="anonymous"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: { brand: { 50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81' } }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .hero-gradient { background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); }
+    .glass-card { background: rgba(255,255,255,0.05); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); }
+    .btn-primary { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); transition: all 0.3s ease; box-shadow: 0 4px 20px rgba(99,102,241,0.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(99,102,241,0.6); }
+    .orb { position:absolute; border-radius:50%; filter:blur(80px); opacity:0.12; }
+    .orb-1 { width:500px; height:500px; background:#6366f1; top:-200px; right:-150px; }
+    .orb-2 { width:350px; height:350px; background:#8b5cf6; bottom:100px; left:-100px; }
+    .htmx-indicator { display:none; }
+    .htmx-request .htmx-indicator { display:flex; }
+    @keyframes spin { to { transform:rotate(360deg) } }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-pulse { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+  </style>
+</head>
+<body class="hero-gradient min-h-screen text-white">
+
+  <!-- Navigation -->
+  <nav class="fixed top-0 left-0 right-0 z-50 glass-card border-0 border-b border-white/10">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center shadow-lg shadow-brand-500/30">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <span class="text-xl font-bold tracking-tight">GatherHub</span>
+      </a>
+      <a href="/" class="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Back to Events
+      </a>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="relative pt-24 pb-20 overflow-hidden">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="relative z-10 max-w-3xl mx-auto px-6">
+      <!-- Breadcrumb -->
+      <nav class="flex items-center gap-2 text-sm text-white/40 mb-8">
+        <a href="/" class="hover:text-white/70 transition-colors">Home</a>
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+        <span class="text-white/60">Event Details</span>
+      </nav>
+
+      <!-- Loading state -->
+      <div id="event-loading" class="text-center py-20">
+        <div class="inline-flex flex-col items-center gap-4">
+          <svg class="w-10 h-10 animate-spin text-brand-400" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          <p class="text-white/50 text-sm">Loading event details...</p>
+        </div>
+      </div>
+
+      <!-- Event detail content injected here by HTMX -->
+      <div id="event-content" class="hidden"></div>
+
+      <!-- Error state -->
+      <div id="event-error" class="hidden">
+        <div class="glass-card rounded-3xl p-12 text-center">
+          <div class="w-16 h-16 rounded-3xl bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <h2 class="text-xl font-bold text-white mb-2">Event Not Found</h2>
+          <p class="text-white/50 mb-6">The event you're looking for doesn't exist or has been removed.</p>
+          <a href="/" class="btn-primary inline-flex items-center gap-2 font-semibold px-6 py-3 rounded-xl text-white text-sm">
+            Back to Events
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-white/10 py-8">
+    <div class="max-w-7xl mx-auto px-6 text-center">
+      <p class="text-white/30 text-sm">© 2025 GatherHub · Modern Event Registration Platform</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const eventId = params.get('id');
+
+      if (!eventId || isNaN(parseInt(eventId))) {
+        document.getElementById('event-loading').classList.add('hidden');
+        document.getElementById('event-error').classList.remove('hidden');
+        return;
+      }
+
+      // Update page title with event ID while loading
+      document.title = `Event #${eventId} — GatherHub`;
+
+      // Use htmx.ajax to load event fragment
+      htmx.ajax('GET', `/fragments/events/${eventId}`, {
+        target: '#event-content',
+        swap: 'innerHTML'
+      }).then(() => {
+        document.getElementById('event-loading').classList.add('hidden');
+        document.getElementById('event-content').classList.remove('hidden');
+
+        // Update page title from loaded content
+        const h1 = document.querySelector('#event-content h1');
+        if (h1) document.title = `${h1.textContent.trim()} — GatherHub`;
+      }).catch(() => {
+        document.getElementById('event-loading').classList.add('hidden');
+        document.getElementById('event-error').classList.remove('hidden');
+      });
+    });
+
+    // Handle HTMX error responses
+    document.body.addEventListener('htmx:responseError', () => {
+      document.getElementById('event-loading').classList.add('hidden');
+      document.getElementById('event-error').classList.remove('hidden');
+    });
+  </script>
+</body>
+</html>

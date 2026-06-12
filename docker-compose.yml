@@ -36,11 +36,14 @@ services:
       DB_PASSWORD: gatherhub
       DB_NAME: gatherhub
       DB_SSLMODE: disable
-      UPLOAD_DIR: /app/uploads
+      UPLOAD_DIR: /app/storage/uploads
+      PAYMENT_UPLOAD_DIR: /app/storage/payments
+      FRONTEND_DIR: /app/frontend
     ports:
       - "3000:3000"
     volumes:
-      - ./storage/uploads:/app/uploads
+      - ./storage:/app/storage
+      - ./frontend:/app/frontend:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,6 +61,7 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./frontend:/usr/share/nginx/html:ro
       - ./storage/uploads:/var/www/uploads:ro
+      - ./storage/payments:/var/www/payments:ro
     depends_on:
       - backend
 
