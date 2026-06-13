@@ -246,6 +246,7 @@ func NewAdminHandler(
 		"admin_participant_qr.html",
 		"admin_backups.html",
 		"admin_checkin.html",
+		"admin_attendance.html",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse admin templates: %w", err)
@@ -2302,3 +2303,68 @@ func (h *AdminHandler) CheckinSubmit(c *fiber.Ctx) error {
 	setFlash(c, "success", "Peserta \""+p.FullName+"\" berhasil di-check in.")
 	return c.Redirect("/admin/checkin", fiber.StatusSeeOther)
 }
+
+// AdminAttendanceData contains all the data needed for the attendance dashboard template.
+type AdminAttendanceData struct {
+	AdminUser       string
+	AdminRole       string
+	Events          []models.Event
+	Stats           *services.ParticipantStats
+	Checkins        []models.Attendance
+	SelectedEventID uint
+	SelectedDate    string
+	Search          string
+}
+
+// AttendanceDashboard handles GET /admin/attendance
+func (h *AdminHandler) AttendanceDashboard(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	var eventID uint
+	if eventIDStr := c.Query("event_id"); eventIDStr != "" {
+		if val, err := strconv.Atoi(eventIDStr); err == nil && val > 0 {
+			eventID = uint(val)
+		}
+	}
+
+	date := strings.TrimSpace(c.Query("date"))
+	search := strings.TrimSpace(c.Query("q"))
+
+	// Fetch active events list for the dropdown filter
+	events, err := h.eventService.GetAll()
+	if err != nil {
+		events = []models.Event{}
+	}
+
+	// Fetch attendance stats with filters
+	stats, err := h.participantService.GetAttendanceStats(eventID, date)
+	if err != nil {
+		stats = &services.ParticipantStats{}
+	}
+
+	// Fetch latest check-ins
+	checkins, err := h.checkinService.GetLatestCheckins(eventID, date, search, 50)
+	if err != nil {
+		checkins = []models.Attendance{}
+	}
+
+	data := AdminAttendanceData{
+		AdminUser:       adminUser,
+		AdminRole:       adminRole,
+		Events:          events,
+		Stats:           stats,
+		Checkins:        checkins,
+		SelectedEventID: eventID,
+		SelectedDate:    date,
+		Search:          search,
+	}
+
+	// If HTMX request, render only the partial fragment template block
+	if c.Get("HX-Request") == "true" {
+		return h.render(c, "attendance_fragment", data)
+	}
+
+	return h.render(c, "admin_attendance.html", data)
+}
+

@@ -174,3 +174,36 @@ func (s *CheckinService) GetAttendance(participantID, eventID uint) (*models.Att
 	return &att, nil
 }
 
+// GetLatestCheckins returns a list of the most recent check-ins, preloading participant and event relations.
+func (s *CheckinService) GetLatestCheckins(eventID uint, date string, search string, limit int) ([]models.Attendance, error) {
+	var attendances []models.Attendance
+	q := s.db.Preload("Participant").Preload("Event")
+
+	if eventID > 0 {
+		q = q.Where("attendances.event_id = ?", eventID)
+	}
+
+	if date != "" {
+		q = q.Where("DATE(attendances.checked_in_at) = ?", date)
+	}
+
+	if search != "" {
+		q = q.Joins("JOIN participants ON participants.id = attendances.participant_id").
+			Select("attendances.*").
+			Where("participants.full_name ILIKE ? OR participants.registration_number ILIKE ? OR participants.company_name ILIKE ?",
+				"%"+search+"%", "%"+search+"%", "%"+search+"%")
+	}
+
+	if limit <= 0 {
+		limit = 50
+	}
+
+	err := q.Order("attendances.checked_in_at DESC").Limit(limit).Find(&attendances).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return attendances, nil
+}
+
+

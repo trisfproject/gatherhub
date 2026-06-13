@@ -118,6 +118,7 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	// Check-in routes
 	admin.Get("/checkin", adminHandler.CheckinPage)
 	admin.Post("/checkin/:participant_id", adminHandler.CheckinSubmit)
+	admin.Get("/attendance", adminHandler.AttendanceDashboard)
 
 
 	// Admin management & settings (SUPER_ADMIN only)

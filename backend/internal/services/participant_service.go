@@ -388,6 +388,66 @@ func (s *ParticipantService) GetFilteredStats(eventID uint, startDate, endDate s
 	return stats, nil
 }
 
+// GetAttendanceStats returns participant stats filtered by event and date.
+func (s *ParticipantService) GetAttendanceStats(eventID uint, date string) (*ParticipantStats, error) {
+	stats := &ParticipantStats{}
+
+	// Query standard status counts
+	q := s.db.Model(&models.Participant{})
+	if eventID > 0 {
+		q = q.Where("event_id = ?", eventID)
+	}
+	if date != "" {
+		q = q.Where("DATE(created_at) = ?", date)
+	}
+
+	type row struct {
+		Status models.ParticipantStatus
+		Count  int64
+	}
+	var rows []row
+
+	if err := q.Select("status, count(*) as count").Group("status").Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	for _, r := range rows {
+		stats.Total += r.Count
+		switch r.Status {
+		case models.StatusPending:
+			stats.Pending = r.Count
+		case models.StatusVerified:
+			stats.Verified = r.Count
+		case models.StatusRejected:
+			stats.Rejected = r.Count
+		case models.StatusCheckedIn:
+			stats.CheckedIn = r.Count
+		}
+	}
+
+	// For an attendance dashboard, if a date filter is applied, the checked-in counter
+	// should represent the number of actual check-ins that occurred on that date.
+	if date != "" {
+		var checkedInCount int64
+		qa := s.db.Model(&models.Attendance{}).Where("DATE(checked_in_at) = ?", date)
+		if eventID > 0 {
+			qa = qa.Where("event_id = ?", eventID)
+		}
+		if err := qa.Count(&checkedInCount).Error; err != nil {
+			return nil, err
+		}
+		stats.CheckedIn = checkedInCount
+	}
+
+	stats.VerifiedTotal = stats.Verified + stats.CheckedIn
+	if stats.VerifiedTotal > 0 {
+		stats.AttendanceRate = float64(stats.CheckedIn) / float64(stats.VerifiedTotal) * 100.0
+	}
+
+	return stats, nil
+}
+
+
 // GetAnalytics returns aggregated chart data matching active filters
 func (s *ParticipantService) GetAnalytics(eventID uint, startDate, endDate string) (*DashboardAnalytics, error) {
 	analytics := &DashboardAnalytics{
