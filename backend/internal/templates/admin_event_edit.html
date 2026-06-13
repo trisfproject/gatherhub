@@ -278,11 +278,19 @@
             </div>
           </label>
 
-          <label class="flex items-center gap-3 bg-white/3 border border-white/5 p-4 rounded-xl cursor-pointer hover:bg-white/5 transition-colors">
+           <label class="flex items-center gap-3 bg-white/3 border border-white/5 p-4 rounded-xl cursor-pointer hover:bg-white/5 transition-colors">
             <input type="checkbox" name="enable_waiting_list" value="true" class="w-4 h-4 rounded text-indigo-600 bg-white/5 border-white/10" {{if isEq (index .Form "enable_waiting_list") "true"}}checked{{end}}/>
             <div>
               <p class="text-sm font-semibold text-white">Enable Waiting List</p>
               <p class="text-white/40 text-xxs">Aktifkan daftar tunggu ketika kuota pendaftaran terpenuhi</p>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-3 bg-white/3 border border-white/5 p-4 rounded-xl cursor-pointer hover:bg-white/5 transition-colors">
+            <input type="checkbox" name="enable_sponsors" value="true" class="w-4 h-4 rounded text-indigo-600 bg-white/5 border-white/10" {{if isEq (index .Form "enable_sponsors") "true"}}checked{{end}}/>
+            <div>
+              <p class="text-sm font-semibold text-white">Enable Sponsors</p>
+              <p class="text-white/40 text-xxs">Tampilkan daftar sponsor dan partner di halaman publik acara</p>
             </div>
           </label>
         </div>

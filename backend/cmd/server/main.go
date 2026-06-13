@@ -62,6 +62,7 @@ func main() {
 	// Update existing data for waiting list setting and status
 	db.Exec("UPDATE events SET enable_waiting_list = true WHERE enable_waiting_list IS NULL")
 	db.Exec("UPDATE participants SET status = 'REGISTERED' WHERE status = 'PENDING'")
+	db.Exec("UPDATE events SET enable_sponsors = false WHERE enable_sponsors IS NULL")
 
 	// ── Load Settings Service ─────────────────────────────────
 	settingsService := services.NewSettingsService(db)
@@ -117,6 +118,10 @@ func main() {
 		Compress: false,
 	})
 	app.Static("/events", storageService.GetEventsPath(), fiber.Static{
+		MaxAge:   86400,
+		Compress: false,
+	})
+	app.Static("/sponsors", storageService.GetSponsorsPath(), fiber.Static{
 		MaxAge:   86400,
 		Compress: false,
 	})

@@ -242,6 +242,10 @@
             <p class="text-white font-semibold truncate">{{.SelectedEvent.AdminName}}</p>
           </div>
           <div class="bg-white/4 rounded-xl p-3.5 col-span-1">
+            <p class="text-white/35 text-xs mb-1">Jumlah Sponsor</p>
+            <p class="text-white font-bold">{{.SponsorCount}}</p>
+          </div>
+          <div class="bg-white/4 rounded-xl p-3.5 col-span-1">
             <p class="text-white/35 text-xs mb-1">Kapasitas (Capacity)</p>
             <p class="text-white font-bold">{{if gt .Stats.Capacity 0}}{{.Stats.Capacity}}{{else}}Tanpa Batas{{end}}</p>
           </div>

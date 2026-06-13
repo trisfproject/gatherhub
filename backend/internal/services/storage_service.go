@@ -43,6 +43,7 @@ func (s *StorageService) ensureDirs(root string) error {
 		filepath.Join(root, "payments"),
 		filepath.Join(root, "events"),
 		filepath.Join(root, "temp"),
+		filepath.Join(root, "sponsors"),
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -120,6 +121,41 @@ func (s *StorageService) GetPaymentsPath() string {
 // GetEventsPath returns the path to the events directory.
 func (s *StorageService) GetEventsPath() string {
 	return filepath.Join(s.GetRootPath(), "events")
+}
+
+// GetSponsorsPath returns the path to the sponsors directory.
+func (s *StorageService) GetSponsorsPath() string {
+	return filepath.Join(s.GetRootPath(), "sponsors")
+}
+
+// SaveSponsorLogo saves a sponsor logo file to the sponsors storage path and returns the generated filename.
+func (s *StorageService) SaveSponsorLogo(file *multipart.FileHeader) (string, error) {
+	root := s.GetRootPath()
+	if err := s.ensureDirs(root); err != nil {
+		return "", err
+	}
+
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	filename := fmt.Sprintf("sponsor_%d%s", time.Now().UnixNano(), ext)
+	fullPath := filepath.Join(root, "sponsors", filename)
+
+	src, err := file.Open()
+	if err != nil {
+		return "", fmt.Errorf("failed to open upload source file: %w", err)
+	}
+	defer src.Close()
+
+	dst, err := os.Create(fullPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to create destination file in storage: %w", err)
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, src); err != nil {
+		return "", fmt.Errorf("failed to write uploaded file to storage: %w", err)
+	}
+
+	return filename, nil
 }
 
 // GetTempPath returns the path to the temp directory.

@@ -48,6 +48,33 @@ type AdminDashboardData struct {
 	StartDate           string
 	EndDate             string
 	AnalyticsJSON       string
+	SponsorCount        int
+}
+
+type AdminSponsorsData struct {
+	AdminBase
+	Sponsors     []models.Sponsor
+	FlashSuccess string
+	FlashError   string
+}
+
+type AdminSponsorCreateData struct {
+	AdminBase
+	Events       []models.Event
+	Errors       []string
+	Form         map[string]string
+	FlashSuccess string
+	FlashError   string
+}
+
+type AdminSponsorEditData struct {
+	AdminBase
+	Sponsor      *models.Sponsor
+	Events       []models.Event
+	Errors       []string
+	Form         map[string]string
+	FlashSuccess string
+	FlashError   string
 }
 
 type ParticipantPage struct {
@@ -194,6 +221,7 @@ type AdminHandler struct {
 	backupService       *services.BackupService
 	broadcastService    *services.BroadcastService
 	healthService       *services.HealthService
+	sponsorService      *services.SponsorService
 	tmpl                *template.Template
 }
 
@@ -211,6 +239,7 @@ func NewAdminHandler(
 	backupService *services.BackupService,
 	broadcastService *services.BroadcastService,
 	healthService *services.HealthService,
+	sponsorService *services.SponsorService,
 ) (*AdminHandler, error) {
 	funcMap := buildAdminFuncMap()
 	funcMap["setting"] = func(key string) string {
@@ -245,6 +274,9 @@ func NewAdminHandler(
 		"admin_broadcast_detail.html",
 		"admin_system.html",
 		"admin_transportation.html",
+		"admin_sponsors.html",
+		"admin_sponsor_create.html",
+		"admin_sponsor_edit.html",
 		"admin_sidebar.html",
 	)
 	if err != nil {
@@ -263,6 +295,7 @@ func NewAdminHandler(
 		backupService:       backupService,
 		broadcastService:    broadcastService,
 		healthService:       healthService,
+		sponsorService:      sponsorService,
 		tmpl:                t,
 	}, nil
 }
@@ -364,6 +397,13 @@ func (h *AdminHandler) Dashboard(c *fiber.Ctx) error {
 		analyticsJSON = "{}"
 	}
 
+	sponsorCount := 0
+	if selectedEventID > 0 {
+		if count, err := h.sponsorService.GetCountByEvent(selectedEventID); err == nil {
+			sponsorCount = int(count)
+		}
+	}
+
 	adminUser, _ := c.Locals("admin_username").(string)
 	adminRole, _ := c.Locals("admin_role").(string)
 
@@ -382,6 +422,7 @@ func (h *AdminHandler) Dashboard(c *fiber.Ctx) error {
 		StartDate:           startDate,
 		EndDate:             endDate,
 		AnalyticsJSON:       analyticsJSON,
+		SponsorCount:        sponsorCount,
 	})
 }
 
@@ -899,6 +940,7 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 		"enable_tshirt_size":       c.FormValue("enable_tshirt_size"),
 		"enable_transportation_coordination": c.FormValue("enable_transportation_coordination"),
 		"enable_waiting_list":      c.FormValue("enable_waiting_list"),
+		"enable_sponsors":          c.FormValue("enable_sponsors"),
 	}
 
 	var errs []string
@@ -1038,6 +1080,7 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 		EnableTShirtSize:       c.FormValue("enable_tshirt_size") == "true",
 		EnableTransportationCoordination: c.FormValue("enable_transportation_coordination") == "true",
 		EnableWaitingList:      c.FormValue("enable_waiting_list") == "true",
+		EnableSponsors:         c.FormValue("enable_sponsors") == "true",
 	}
 
 	if err := h.eventService.Create(newEvent); err != nil {
@@ -1187,6 +1230,7 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 		"enable_tshirt_size":       c.FormValue("enable_tshirt_size"),
 		"enable_transportation_coordination": c.FormValue("enable_transportation_coordination"),
 		"enable_waiting_list":      c.FormValue("enable_waiting_list"),
+		"enable_sponsors":          c.FormValue("enable_sponsors"),
 	}
 
 	var errs []string
@@ -1325,6 +1369,7 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 	event.EnableTShirtSize = c.FormValue("enable_tshirt_size") == "true"
 	event.EnableTransportationCoordination = c.FormValue("enable_transportation_coordination") == "true"
 	event.EnableWaitingList = c.FormValue("enable_waiting_list") == "true"
+	event.EnableSponsors = c.FormValue("enable_sponsors") == "true"
 
 	if err := h.eventService.Update(event); err != nil {
 		errs = append(errs, "Gagal memperbarui Acara: "+err.Error())
@@ -2940,6 +2985,12 @@ func BuildSidebarItems(role string, active string, stats *services.ParticipantSt
 			Active: active == "transportation",
 		},
 		{
+			Title:  "Sponsor & Partner",
+			URL:    "/admin/sponsors",
+			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+			Active: active == "sponsors",
+		},
+		{
 			Title:  "Kesehatan Sistem",
 			URL:    "/admin/system",
 			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>`,
@@ -3361,4 +3412,395 @@ func (h *AdminHandler) ExportTransportation(c *fiber.Ctx) error {
 	}
 
 	return nil
+}
+
+// SponsorList handles GET /admin/sponsors
+func (h *AdminHandler) SponsorList(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	sponsors, err := h.sponsorService.GetAllForAdmin()
+	if err != nil {
+		sponsors = []models.Sponsor{}
+	}
+
+	stats, _ := h.participantService.GetStats()
+
+	return h.render(c, "admin_sponsors.html", AdminSponsorsData{
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "sponsors",
+			Stats:      stats,
+		},
+		Sponsors:     sponsors,
+		FlashSuccess: getFlash(c, "success"),
+		FlashError:   getFlash(c, "error"),
+	})
+}
+
+// SponsorCreatePage handles GET /admin/sponsors/create
+func (h *AdminHandler) SponsorCreatePage(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	events, _ := h.eventService.GetAll()
+	stats, _ := h.participantService.GetStats()
+
+	return h.render(c, "admin_sponsor_create.html", AdminSponsorCreateData{
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "sponsors",
+			Stats:      stats,
+		},
+		Events:       events,
+		Form:         map[string]string{"active": "true", "display_order": "0"},
+		FlashSuccess: getFlash(c, "success"),
+		FlashError:   getFlash(c, "error"),
+	})
+}
+
+// SponsorCreateSubmit handles POST /admin/sponsors/create
+func (h *AdminHandler) SponsorCreateSubmit(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	eventIDStr := c.FormValue("event_id")
+	name := strings.TrimSpace(c.FormValue("name"))
+	category := strings.TrimSpace(c.FormValue("category"))
+	websiteURL := strings.TrimSpace(c.FormValue("website_url"))
+	displayOrderStr := strings.TrimSpace(c.FormValue("display_order"))
+	active := c.FormValue("active") == "true" || c.FormValue("active") == "on"
+
+	formValues := map[string]string{
+		"event_id":      eventIDStr,
+		"name":          name,
+		"category":      category,
+		"website_url":   websiteURL,
+		"display_order": displayOrderStr,
+		"active":        c.FormValue("active"),
+	}
+
+	var errs []string
+	var eventID int
+	var err error
+	if eventIDStr != "" {
+		eventID, err = strconv.Atoi(eventIDStr)
+		if err != nil || eventID <= 0 {
+			errs = append(errs, "Pilihan Acara tidak valid")
+		}
+	} else {
+		errs = append(errs, "Acara wajib dipilih")
+	}
+
+	if name == "" {
+		errs = append(errs, "Nama Sponsor/Partner wajib diisi")
+	}
+
+	allowedCategories := map[string]bool{
+		"Title Sponsor": true, "Platinum Sponsor": true, "Gold Sponsor": true,
+		"Silver Sponsor": true, "Bronze Sponsor": true, "Community Partner": true,
+		"Media Partner": true,
+	}
+	if category == "" {
+		errs = append(errs, "Kategori wajib diisi")
+	} else if !allowedCategories[category] {
+		errs = append(errs, "Kategori tidak valid")
+	}
+
+	displayOrder := 0
+	if displayOrderStr != "" {
+		displayOrder, err = strconv.Atoi(displayOrderStr)
+		if err != nil {
+			errs = append(errs, "Format urutan tampilan tidak valid")
+		}
+	}
+
+	logoFilename := ""
+	file, fileErr := c.FormFile("logo")
+	if fileErr != nil {
+		errs = append(errs, "Logo wajib diunggah")
+	} else {
+		ext := strings.ToLower(filepath.Ext(file.Filename))
+		allowedExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true}
+		if !allowedExts[ext] {
+			errs = append(errs, "Format Logo hanya boleh JPG, JPEG, PNG, atau WEBP")
+		} else if file.Size > 5*1024*1024 {
+			errs = append(errs, "Ukuran Logo maksimal 5MB")
+		} else {
+			logoFilename, err = h.storageService.SaveSponsorLogo(file)
+			if err != nil {
+				errs = append(errs, "Gagal mengunggah Logo: "+err.Error())
+			}
+		}
+	}
+
+	if len(errs) > 0 {
+		events, _ := h.eventService.GetAll()
+		stats, _ := h.participantService.GetStats()
+		return h.render(c, "admin_sponsor_create.html", AdminSponsorCreateData{
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "sponsors",
+				Stats:      stats,
+			},
+			Events:       events,
+			Errors:       errs,
+			Form:         formValues,
+			FlashSuccess: getFlash(c, "success"),
+			FlashError:   getFlash(c, "error"),
+		})
+	}
+
+	newSponsor := &models.Sponsor{
+		EventID:      uint(eventID),
+		Name:         name,
+		Category:     category,
+		Logo:         logoFilename,
+		WebsiteURL:   websiteURL,
+		DisplayOrder: displayOrder,
+		Active:       active,
+	}
+
+	if err := h.sponsorService.Create(newSponsor); err != nil {
+		errs = append(errs, "Gagal menyimpan Sponsor/Mitra: "+err.Error())
+		events, _ := h.eventService.GetAll()
+		stats, _ := h.participantService.GetStats()
+		return h.render(c, "admin_sponsor_create.html", AdminSponsorCreateData{
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "sponsors",
+				Stats:      stats,
+			},
+			Events:       events,
+			Errors:       errs,
+			Form:         formValues,
+			FlashSuccess: getFlash(c, "success"),
+			FlashError:   getFlash(c, "error"),
+		})
+	}
+
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, "CREATE", "SPONSOR", newSponsor.ID, "", newSponsor, c.IP(), c.Get("User-Agent"))
+	}
+
+	setFlash(c, "success", "Sponsor/Mitra \""+name+"\" berhasil ditambahkan.")
+	return c.Redirect("/admin/sponsors", fiber.StatusSeeOther)
+}
+
+// SponsorEditPage handles GET /admin/sponsors/:id/edit
+func (h *AdminHandler) SponsorEditPage(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		return c.Redirect("/admin/sponsors", fiber.StatusSeeOther)
+	}
+
+	sponsor, err := h.sponsorService.GetByID(uint(id))
+	if err != nil {
+		return c.Redirect("/admin/sponsors", fiber.StatusSeeOther)
+	}
+
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	events, _ := h.eventService.GetAll()
+	stats, _ := h.participantService.GetStats()
+
+	formValues := map[string]string{
+		"event_id":      strconv.Itoa(int(sponsor.EventID)),
+		"name":          sponsor.Name,
+		"category":      sponsor.Category,
+		"website_url":   sponsor.WebsiteURL,
+		"display_order": strconv.Itoa(sponsor.DisplayOrder),
+		"active":        strconv.FormatBool(sponsor.Active),
+	}
+
+	return h.render(c, "admin_sponsor_edit.html", AdminSponsorEditData{
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "sponsors",
+			Stats:      stats,
+		},
+		Sponsor:      sponsor,
+		Events:       events,
+		Form:         formValues,
+		FlashSuccess: getFlash(c, "success"),
+		FlashError:   getFlash(c, "error"),
+	})
+}
+
+// SponsorEditSubmit handles POST /admin/sponsors/:id/edit
+func (h *AdminHandler) SponsorEditSubmit(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		return c.Redirect("/admin/sponsors", fiber.StatusSeeOther)
+	}
+
+	sponsor, err := h.sponsorService.GetByID(uint(id))
+	if err != nil {
+		return c.Redirect("/admin/sponsors", fiber.StatusSeeOther)
+	}
+
+	oldSponsorJSON := ""
+	if bytes, err := json.Marshal(sponsor); err == nil {
+		oldSponsorJSON = string(bytes)
+	}
+
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	eventIDStr := c.FormValue("event_id")
+	name := strings.TrimSpace(c.FormValue("name"))
+	category := strings.TrimSpace(c.FormValue("category"))
+	websiteURL := strings.TrimSpace(c.FormValue("website_url"))
+	displayOrderStr := strings.TrimSpace(c.FormValue("display_order"))
+	active := c.FormValue("active") == "true" || c.FormValue("active") == "on"
+
+	formValues := map[string]string{
+		"event_id":      eventIDStr,
+		"name":          name,
+		"category":      category,
+		"website_url":   websiteURL,
+		"display_order": displayOrderStr,
+		"active":        c.FormValue("active"),
+	}
+
+	var errs []string
+	var eventID int
+	if eventIDStr != "" {
+		eventID, err = strconv.Atoi(eventIDStr)
+		if err != nil || eventID <= 0 {
+			errs = append(errs, "Pilihan Acara tidak valid")
+		}
+	} else {
+		errs = append(errs, "Acara wajib dipilih")
+	}
+
+	if name == "" {
+		errs = append(errs, "Nama Sponsor/Partner wajib diisi")
+	}
+
+	allowedCategories := map[string]bool{
+		"Title Sponsor": true, "Platinum Sponsor": true, "Gold Sponsor": true,
+		"Silver Sponsor": true, "Bronze Sponsor": true, "Community Partner": true,
+		"Media Partner": true,
+	}
+	if category == "" {
+		errs = append(errs, "Kategori wajib diisi")
+	} else if !allowedCategories[category] {
+		errs = append(errs, "Kategori tidak valid")
+	}
+
+	displayOrder := 0
+	if displayOrderStr != "" {
+		displayOrder, err = strconv.Atoi(displayOrderStr)
+		if err != nil {
+			errs = append(errs, "Format urutan tampilan tidak valid")
+		}
+	}
+
+	logoFilename := sponsor.Logo
+	file, fileErr := c.FormFile("logo")
+	if fileErr == nil && file != nil {
+		ext := strings.ToLower(filepath.Ext(file.Filename))
+		allowedExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true}
+		if !allowedExts[ext] {
+			errs = append(errs, "Format Logo hanya boleh JPG, JPEG, PNG, atau WEBP")
+		} else if file.Size > 5*1024*1024 {
+			errs = append(errs, "Ukuran Logo maksimal 5MB")
+		} else {
+			logoFilename, err = h.storageService.SaveSponsorLogo(file)
+			if err != nil {
+				errs = append(errs, "Gagal mengunggah Logo: "+err.Error())
+			}
+		}
+	}
+
+	if len(errs) > 0 {
+		events, _ := h.eventService.GetAll()
+		stats, _ := h.participantService.GetStats()
+		return h.render(c, "admin_sponsor_edit.html", AdminSponsorEditData{
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "sponsors",
+				Stats:      stats,
+			},
+			Sponsor:      sponsor,
+			Events:       events,
+			Errors:       errs,
+			Form:         formValues,
+			FlashSuccess: getFlash(c, "success"),
+			FlashError:   getFlash(c, "error"),
+		})
+	}
+
+	sponsor.EventID = uint(eventID)
+	sponsor.Name = name
+	sponsor.Category = category
+	sponsor.Logo = logoFilename
+	sponsor.WebsiteURL = websiteURL
+	sponsor.DisplayOrder = displayOrder
+	sponsor.Active = active
+
+	if err := h.sponsorService.Update(sponsor); err != nil {
+		errs = append(errs, "Gagal memperbarui Sponsor/Mitra: "+err.Error())
+		events, _ := h.eventService.GetAll()
+		stats, _ := h.participantService.GetStats()
+		return h.render(c, "admin_sponsor_edit.html", AdminSponsorEditData{
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "sponsors",
+				Stats:      stats,
+			},
+			Sponsor:      sponsor,
+			Events:       events,
+			Errors:       errs,
+			Form:         formValues,
+			FlashSuccess: getFlash(c, "success"),
+			FlashError:   getFlash(c, "error"),
+		})
+	}
+
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, "UPDATE", "SPONSOR", sponsor.ID, oldSponsorJSON, sponsor, c.IP(), c.Get("User-Agent"))
+	}
+
+	setFlash(c, "success", "Sponsor/Mitra \""+name+"\" berhasil diperbarui.")
+	return c.Redirect("/admin/sponsors", fiber.StatusSeeOther)
+}
+
+// SponsorDelete handles POST /admin/sponsors/:id/delete
+func (h *AdminHandler) SponsorDelete(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID tidak valid"})
+	}
+
+	sponsor, err := h.sponsorService.GetByID(uint(id))
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Sponsor tidak ditemukan"})
+	}
+
+	sponsorJSON := ""
+	if bytes, err := json.Marshal(sponsor); err == nil {
+		sponsorJSON = string(bytes)
+	}
+
+	if err := h.sponsorService.Delete(uint(id)); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghapus sponsor: " + err.Error()})
+	}
+
+	adminUser, _ := c.Locals("admin_username").(string)
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, "DELETE", "SPONSOR", uint(id), sponsorJSON, nil, c.IP(), c.Get("User-Agent"))
+	}
+
+	setFlash(c, "success", "Sponsor/Mitra \""+sponsor.Name+"\" berhasil dihapus.")
+	return c.Redirect("/admin/sponsors", fiber.StatusSeeOther)
 }

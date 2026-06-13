@@ -33,9 +33,11 @@ type Event struct {
 	EnableTShirtSize       bool      `json:"enable_tshirt_size" gorm:"not null;default:false"`
 	EnableTransportationCoordination bool `json:"enable_transportation_coordination" gorm:"not null;default:false"`
 	EnableWaitingList      bool      `json:"enable_waiting_list" gorm:"not null;default:true"`
+	EnableSponsors         bool      `json:"enable_sponsors" gorm:"not null;default:false"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
 
 	// Associations
 	Participants []Participant `json:"participants,omitempty" gorm:"foreignKey:EventID"`
+	Sponsors     []Sponsor     `json:"sponsors,omitempty" gorm:"foreignKey:EventID"`
 }

@@ -23,6 +23,7 @@ var canonicalMenuOrder = []string{
 	"/admin/attendance",
 	"/admin/broadcasts",
 	"/admin/transportation",
+	"/admin/sponsors",
 	"/admin/system",
 	// /admin/admins and /admin/settings are SUPER_ADMIN only (conditional)
 	// /  is "Halaman Publik" — external link

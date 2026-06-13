@@ -513,6 +513,39 @@ func buildFuncMap() template.FuncMap {
 		"formatYear": func(t time.Time) string {
 			return fmt.Sprintf("%d", t.Year())
 		},
+		"hasSponsors": func(sponsors []models.Sponsor) bool {
+			for _, s := range sponsors {
+				switch s.Category {
+				case "Title Sponsor", "Platinum Sponsor", "Gold Sponsor", "Silver Sponsor", "Bronze Sponsor":
+					return true
+				}
+			}
+			return false
+		},
+		"hasPartners": func(sponsors []models.Sponsor) bool {
+			for _, s := range sponsors {
+				switch s.Category {
+				case "Community Partner", "Media Partner":
+					return true
+				}
+			}
+			return false
+		},
+		"sponsorCategories": func() []string {
+			return []string{"Title Sponsor", "Platinum Sponsor", "Gold Sponsor", "Silver Sponsor", "Bronze Sponsor"}
+		},
+		"partnerCategories": func() []string {
+			return []string{"Community Partner", "Media Partner"}
+		},
+		"filterSponsors": func(sponsors []models.Sponsor, category string) []models.Sponsor {
+			var res []models.Sponsor
+			for _, s := range sponsors {
+				if s.Category == category {
+					res = append(res, s)
+				}
+			}
+			return res
+		},
 	}
 }
 

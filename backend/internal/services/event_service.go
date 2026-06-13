@@ -26,31 +26,37 @@ func (s *EventService) GetAll() ([]models.Event, error) {
 	return events, result.Error
 }
 
-// GetByID returns a single event by ID, preloading its participants
+// GetByID returns a single event by ID, preloading its participants and sponsors
 func (s *EventService) GetByID(id uint) (*models.Event, error) {
 	var event models.Event
-	result := s.db.Preload("Participants").First(&event, id)
+	result := s.db.Preload("Participants").Preload("Sponsors", func(db *gorm.DB) *gorm.DB {
+		return db.Order("display_order ASC, name ASC")
+	}).First(&event, id)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("event with id %d not found", id)
 	}
 	return &event, result.Error
 }
 
-// GetBySlug returns a single event by Slug
+// GetBySlug returns a single event by Slug preloading active sponsors
 func (s *EventService) GetBySlug(slug string) (*models.Event, error) {
 	var event models.Event
-	result := s.db.Where("slug = ?", slug).First(&event)
+	result := s.db.Preload("Sponsors", func(db *gorm.DB) *gorm.DB {
+		return db.Where("active = ?", true).Order("display_order ASC, name ASC")
+	}).Where("slug = ?", slug).First(&event)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("event with slug %s not found", slug)
 	}
 	return &event, result.Error
 }
 
-// GetFirst returns the first active published event (earliest by created_at)
+// GetFirst returns the first active published event (earliest by created_at) preloading active sponsors
 // This is used for the single-event landing page flow
 func (s *EventService) GetFirst() (*models.Event, error) {
 	var event models.Event
-	result := s.db.Where("status = ?", "PUBLISHED").Order("created_at ASC").First(&event)
+	result := s.db.Preload("Sponsors", func(db *gorm.DB) *gorm.DB {
+		return db.Where("active = ?", true).Order("display_order ASC, name ASC")
+	}).Where("status = ?", "PUBLISHED").Order("created_at ASC").First(&event)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("no published events found")
 	}
