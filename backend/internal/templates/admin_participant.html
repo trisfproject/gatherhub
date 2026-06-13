@@ -335,15 +335,6 @@
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-3">
                 <div class="space-y-3">
                   <div class="flex justify-between border-b border-white/4 pb-2.5">
-                    <span class="text-xs text-white/45">Zona Keberangkatan</span>
-                    <span class="text-sm font-semibold text-white">
-                      {{.Participant.DepartureZone}}
-                      {{if isEq .Participant.DepartureZone "Other"}}
-                        ({{or .Participant.DepartureZoneName "–"}})
-                      {{end}}
-                    </span>
-                  </div>
-                  <div class="flex justify-between border-b border-white/4 pb-2.5">
                     <span class="text-xs text-white/45">Status Kendaraan</span>
                     <span class="text-sm font-semibold text-white">
                       {{if .Participant.OwnVehicle}}Membawa Kendaraan ({{if isEq .Participant.VehicleType "Car"}}Mobil{{else if isEq .Participant.VehicleType "Motorcycle"}}Motor{{else}}{{.Participant.VehicleType}}{{end}}){{else}}Mencari Tebengan{{end}}
@@ -362,19 +353,25 @@
                 </div>
 
                 <div class="space-y-3">
+                  <div class="flex justify-between border-b border-white/4 pb-2.5">
+                    <span class="text-xs text-white/45">Status Transportasi</span>
+                    {{$status := .Participant.GetTransportationStatus}}
+                    <span class="text-xs uppercase font-extrabold px-2.5 py-0.5 rounded-lg border {{if isEq $status "Official Driver"}}bg-indigo-500/10 border-indigo-500/30 text-indigo-300{{else if isEq $status "Volunteer Driver"}}bg-amber-500/10 border-amber-500/30 text-amber-400{{else if isEq $status "Passenger"}}bg-emerald-500/10 border-emerald-500/30 text-emerald-400{{else}}bg-white/5 border-white/10 text-white/40{{end}}">
+                      {{$status}}
+                    </span>
+                  </div>
+
                   {{if and .Participant.OwnVehicle (isEq .Participant.VehicleType "Car") .Participant.CarpoolCanBring}}
                   <!-- This participant is a driver -->
                   <div class="flex justify-between border-b border-white/4 pb-2.5">
-                    <span class="text-xs text-white/45">Peran Transportasi</span>
-                    <span class="text-sm font-bold text-indigo-400">Pengemudi (Driver Pool)</span>
+                    <span class="text-xs text-white/45">Official Driver</span>
+                    <span class="text-sm font-semibold {{if .Participant.OfficialDriver}}text-indigo-300 font-bold{{else}}text-white/60{{end}}">
+                      {{if .Participant.OfficialDriver}}Yes{{else}}No{{end}}
+                    </span>
                   </div>
                   <div class="flex justify-between border-b border-white/4 pb-2.5">
                     <span class="text-xs text-white/45">Titik Kumpul</span>
                     <span class="text-sm font-semibold text-white">{{or .Participant.TransportMeetingPoint "–"}}</span>
-                  </div>
-                  <div class="flex justify-between border-b border-white/4 pb-2.5">
-                    <span class="text-xs text-white/45">Waktu Keberangkatan</span>
-                    <span class="text-sm font-semibold text-white">{{or .Participant.TransportDepartureTime "–"}}</span>
                   </div>
                   <div class="flex justify-between pb-1">
                     <span class="text-xs text-white/45">Catatan</span>
@@ -413,10 +410,6 @@
                   <div class="flex justify-between border-b border-white/4 pb-2.5">
                     <span class="text-xs text-white/45">Titik Kumpul</span>
                     <span class="text-sm font-semibold text-white">{{or .Participant.Driver.TransportMeetingPoint "–"}}</span>
-                  </div>
-                  <div class="flex justify-between border-b border-white/4 pb-2.5">
-                    <span class="text-xs text-white/45">Waktu Keberangkatan</span>
-                    <span class="text-sm font-semibold text-white">{{or .Participant.Driver.TransportDepartureTime "–"}}</span>
                   </div>
                   <div class="flex justify-between pb-1">
                     <span class="text-xs text-white/45">Catatan Driver</span>

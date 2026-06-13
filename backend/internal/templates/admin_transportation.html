@@ -122,7 +122,13 @@
             <div class="flex items-start justify-between gap-3">
               <div>
                 <h4 class="font-extrabold text-white text-base leading-snug">{{.FullName}}</h4>
-                <p class="text-xs text-white/45 mt-0.5">{{.CompanyName}}</p>
+                <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                  <span class="text-xs text-white/45">{{.CompanyName}}</span>
+                  <span class="inline-block w-1.5 h-1.5 rounded-full {{if .OfficialDriver}}bg-indigo-400{{else}}bg-amber-400{{end}}"></span>
+                  <span class="text-[9px] uppercase font-bold {{if .OfficialDriver}}text-indigo-300{{else}}text-amber-400{{end}}">
+                    {{if .OfficialDriver}}Official{{else}}Volunteer{{end}}
+                  </span>
+                </div>
               </div>
               <div class="text-right">
                 <span class="inline-block bg-white/5 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-indigo-300 font-bold">
@@ -134,15 +140,19 @@
             <!-- Meta details -->
             <div class="space-y-1.5 mt-4 text-xs text-white/70">
               <div class="flex items-center justify-between">
-                <span class="text-white/40">Zona Keberangkatan</span>
-                <span class="font-semibold text-white">
-                  {{.DepartureZone}}{{if isEq .DepartureZone "Other"}} ({{.DepartureZoneName}}){{end}}
-                </span>
-              </div>
-              <div class="flex items-center justify-between">
                 <span class="text-white/40">Plat Nomor</span>
                 <span class="font-mono font-bold text-white uppercase">{{.LicensePlate}}</span>
               </div>
+              <div class="flex items-center justify-between">
+                <span class="text-white/40">Titik Kumpul (Meeting Point)</span>
+                <span class="font-semibold text-white">{{.TransportMeetingPoint}}</span>
+              </div>
+              {{if .TransportNotes}}
+              <div class="flex flex-col gap-0.5">
+                <span class="text-white/40">Catatan Keberangkatan</span>
+                <span class="text-white/80 bg-white/5 p-1.5 rounded text-[11px] leading-relaxed">{{.TransportNotes}}</span>
+              </div>
+              {{end}}
               <div class="flex items-center justify-between">
                 <span class="text-white/40">WhatsApp</span>
                 <a href="https://wa.me/{{.Phone}}" target="_blank" class="text-emerald-400 hover:underline flex items-center gap-1 font-semibold">
@@ -163,7 +173,7 @@
                 <div class="flex items-center justify-between bg-white/3 rounded-lg p-2 border border-white/5">
                   <div class="min-w-0 flex-1">
                     <p class="text-xs font-bold text-white truncate">{{.FullName}}</p>
-                    <p class="text-[10px] text-white/40 font-medium truncate">{{.DepartureZone}}{{if isEq .DepartureZone "Other"}} ({{.DepartureZoneName}}){{end}}</p>
+                    <p class="text-[10px] text-white/40 font-medium truncate">{{.CompanyName}}</p>
                   </div>
                   <form hx-post="/admin/transportation/unassign" hx-swap="none" class="flex-shrink-0 ml-2">
                     <input type="hidden" name="passenger_id" value="{{.ID}}" />
@@ -182,18 +192,21 @@
           <div class="mt-4 pt-4 border-t border-white/6">
             <form hx-post="/admin/transportation/driver-details" hx-swap="none" class="space-y-2">
               <input type="hidden" name="driver_id" value="{{.ID}}" />
-              <div class="grid grid-cols-2 gap-2">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label class="block text-[10px] font-bold text-white/40 uppercase mb-1">Titik Kumpul</label>
-                  <input type="text" name="meeting_point" value="{{.TransportMeetingPoint}}" placeholder="Titik kumpul..." class="form-input text-xs py-1.5 px-2.5"/>
+                  <label class="block text-[10px] font-bold text-white/40 uppercase mb-1">Driver Resmi?</label>
+                  <select name="official_driver" class="form-input text-xs py-1.5 px-2.5">
+                    <option value="false" {{if not .OfficialDriver}}selected{{end}}>No</option>
+                    <option value="true" {{if .OfficialDriver}}selected{{end}}>Yes</option>
+                  </select>
                 </div>
                 <div>
-                  <label class="block text-[10px] font-bold text-white/40 uppercase mb-1">Jam Berangkat</label>
-                  <input type="text" name="departure_time" value="{{.TransportDepartureTime}}" placeholder="Jam..." class="form-input text-xs py-1.5 px-2.5"/>
+                  <label class="block text-[10px] font-bold text-white/40 uppercase mb-1">Titik Kumpul (Meeting Point)</label>
+                  <input type="text" name="meeting_point" value="{{.TransportMeetingPoint}}" placeholder="Titik kumpul..." class="form-input text-xs py-1.5 px-2.5"/>
                 </div>
               </div>
               <div>
-                <label class="block text-[10px] font-bold text-white/40 uppercase mb-1">Catatan</label>
+                <label class="block text-[10px] font-bold text-white/40 uppercase mb-1">Catatan Keberangkatan</label>
                 <textarea name="notes" rows="1" placeholder="Catatan keberangkatan..." class="form-input text-xs py-1.5 px-2.5 resize-none">{{.TransportNotes}}</textarea>
               </div>
               <button type="submit" class="w-full bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/30 text-indigo-300 font-bold text-[10px] py-1.5 rounded transition-all uppercase tracking-wider">
@@ -224,39 +237,7 @@
             <input type="text" name="q" value="{{.SearchQuery}}" placeholder="Nama, perusahaan, WA..." class="form-input text-xs py-2 pr-8 bg-slate-800 border border-slate-700 text-white rounded-lg"/>
           </div>
 
-          <div class="w-full sm:w-auto">
-            <label class="block text-[10px] font-bold text-white/40 uppercase mb-1">Zona Keberangkatan</label>
-            <select name="zone" class="form-input text-xs py-2 pr-8 bg-slate-800 border border-slate-700 text-white rounded-lg">
-              <option value="">-- Semua Zona --</option>
-              <option value="KIIC" {{if isEq .ZoneFilter "KIIC"}}selected{{end}}>KIIC</option>
-              <option value="Suryacipta" {{if isEq .ZoneFilter "Suryacipta"}}selected{{end}}>Suryacipta</option>
-              <option value="KNIC" {{if isEq .ZoneFilter "KNIC"}}selected{{end}}>KNIC</option>
-              <option value="KIM" {{if isEq .ZoneFilter "KIM"}}selected{{end}}>KIM</option>
-              <option value="KJIE" {{if isEq .ZoneFilter "KJIE"}}selected{{end}}>KJIE</option>
-              <option value="Indotaisei" {{if isEq .ZoneFilter "Indotaisei"}}selected{{end}}>Indotaisei</option>
-              <option value="KIKC" {{if isEq .ZoneFilter "KIKC"}}selected{{end}}>KIKC</option>
-              <option value="SPIKE" {{if isEq .ZoneFilter "SPIKE"}}selected{{end}}>SPIKE</option>
-              <option value="Jababeka" {{if isEq .ZoneFilter "Jababeka"}}selected{{end}}>Jababeka</option>
-              <option value="MM2100" {{if isEq .ZoneFilter "MM2100"}}selected{{end}}>MM2100</option>
-              <option value="EJIP" {{if isEq .ZoneFilter "EJIP"}}selected{{end}}>EJIP</option>
-              <option value="BIIE" {{if isEq .ZoneFilter "BIIE"}}selected{{end}}>BIIE</option>
-              <option value="GIIC" {{if isEq .ZoneFilter "GIIC"}}selected{{end}}>GIIC</option>
-              <option value="Delta Silicon" {{if isEq .ZoneFilter "Delta Silicon"}}selected{{end}}>Delta Silicon</option>
-              <option value="KITIC" {{if isEq .ZoneFilter "KITIC"}}selected{{end}}>KITIC</option>
-              <option value="MCIE" {{if isEq .ZoneFilter "MCIE"}}selected{{end}}>MCIE</option>
-              <option value="Lippo Cikarang" {{if isEq .ZoneFilter "Lippo Cikarang"}}selected{{end}}>Lippo Cikarang</option>
-              <option value="KBI" {{if isEq .ZoneFilter "KBI"}}selected{{end}}>KBI</option>
-              <option value="BIP" {{if isEq .ZoneFilter "BIP"}}selected{{end}}>BIP</option>
-              <option value="Lion Industrial Park" {{if isEq .ZoneFilter "Lion Industrial Park"}}selected{{end}}>Lion Industrial Park</option>
-              <option value="JISC" {{if isEq .ZoneFilter "JISC"}}selected{{end}}>JISC</option>
-              <option value="JIEP" {{if isEq .ZoneFilter "JIEP"}}selected{{end}}>JIEP</option>
-              <option value="KBN Marunda" {{if isEq .ZoneFilter "KBN Marunda"}}selected{{end}}>KBN Marunda</option>
-              <option value="KBN Cakung" {{if isEq .ZoneFilter "KBN Cakung"}}selected{{end}}>KBN Cakung</option>
-              <option value="Jakarta" {{if isEq .ZoneFilter "Jakarta"}}selected{{end}}>Jakarta</option>
-              <option value="Purwakarta" {{if isEq .ZoneFilter "Purwakarta"}}selected{{end}}>Purwakarta</option>
-              <option value="Other" {{if isEq .ZoneFilter "Other"}}selected{{end}}>Other (Lainnya)</option>
-            </select>
-          </div>
+
 
           <div class="w-full sm:w-auto">
             <label class="block text-[10px] font-bold text-white/40 uppercase mb-1">Status Tebengan</label>
@@ -285,14 +266,13 @@
                 <th class="py-3 px-4">Nama Peserta</th>
                 <th class="py-3 px-4">WhatsApp</th>
                 <th class="py-3 px-4">Perusahaan</th>
-                <th class="py-3 px-4">Zona Keberangkatan</th>
                 <th class="py-3 px-4">Penugasan Driver</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-white/6 text-xs">
               {{if not .Passengers}}
               <tr>
-                <td colspan="5" class="py-8 text-center text-white/30 italic">
+                <td colspan="4" class="py-8 text-center text-white/30 italic">
                   Tidak ada penumpang terverifikasi yang cocok dengan filter pencarian.
                 </td>
               </tr>
@@ -312,9 +292,6 @@
                 </td>
                 <td class="py-3 px-4 text-white/75">{{.CompanyName}}</td>
                 <td class="py-3 px-4">
-                  {{.DepartureZone}}{{if isEq .DepartureZone "Other"}} ({{.DepartureZoneName}}){{end}}
-                </td>
-                <td class="py-3 px-4">
                   {{if .DriverID}}
                   <div class="flex items-center gap-2">
                     <span class="text-white/80">Tebengan: <strong>{{.Driver.FullName}}</strong></span>
@@ -330,10 +307,9 @@
                     <input type="hidden" name="passenger_id" value="{{.ID}}" />
                     <select name="driver_id" onchange="if(this.value) { this.form.dispatchEvent(new Event('submit')) }" class="form-input text-xs py-1 px-2 pr-6 bg-slate-800 border border-slate-700 text-white rounded">
                       <option value="">-- Pilih Driver --</option>
-                      {{$pz := .DepartureZone}}
                       {{range $.AllDrivers}}
                       <option value="{{.ID}}">
-                        {{if isEq .DepartureZone $pz}}[Sama Zone] {{end}}{{.FullName}}
+                        {{.FullName}} (Titik Kumpul: {{.TransportMeetingPoint}})
                       </option>
                       {{end}}
                     </select>

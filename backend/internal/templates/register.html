@@ -485,55 +485,11 @@
             </div>
 
             <div class="space-y-4 mb-6">
-              <!-- Departure Zone -->
-              <div>
-                <label for="departure_zone" class="form-label">Zona Keberangkatan<span class="req">*</span></label>
-                <select id="departure_zone" name="departure_zone" class="form-input" onchange="toggleDepartureZoneName()">
-                  <option value="">-- Pilih Zona Keberangkatan --</option>
-                  {{$selectedDZ := index .Form "departure_zone"}}
-                  <option value="KIIC" {{if isEq $selectedDZ "KIIC"}}selected{{end}}>KIIC</option>
-                  <option value="Suryacipta" {{if isEq $selectedDZ "Suryacipta"}}selected{{end}}>Suryacipta</option>
-                  <option value="KNIC" {{if isEq $selectedDZ "KNIC"}}selected{{end}}>KNIC</option>
-                  <option value="KIM" {{if isEq $selectedDZ "KIM"}}selected{{end}}>KIM</option>
-                  <option value="KJIE" {{if isEq $selectedDZ "KJIE"}}selected{{end}}>KJIE</option>
-                  <option value="Indotaisei" {{if isEq $selectedDZ "Indotaisei"}}selected{{end}}>Indotaisei</option>
-                  <option value="KIKC" {{if isEq $selectedDZ "KIKC"}}selected{{end}}>KIKC</option>
-                  <option value="SPIKE" {{if isEq $selectedDZ "SPIKE"}}selected{{end}}>SPIKE</option>
-                  <option value="Jababeka" {{if isEq $selectedDZ "Jababeka"}}selected{{end}}>Jababeka</option>
-                  <option value="MM2100" {{if isEq $selectedDZ "MM2100"}}selected{{end}}>MM2100</option>
-                  <option value="EJIP" {{if isEq $selectedDZ "EJIP"}}selected{{end}}>EJIP</option>
-                  <option value="BIIE" {{if isEq $selectedDZ "BIIE"}}selected{{end}}>BIIE</option>
-                  <option value="GIIC" {{if isEq $selectedDZ "GIIC"}}selected{{end}}>GIIC</option>
-                  <option value="Delta Silicon" {{if isEq $selectedDZ "Delta Silicon"}}selected{{end}}>Delta Silicon</option>
-                  <option value="KITIC" {{if isEq $selectedDZ "KITIC"}}selected{{end}}>KITIC</option>
-                  <option value="MCIE" {{if isEq $selectedDZ "MCIE"}}selected{{end}}>MCIE</option>
-                  <option value="Lippo Cikarang" {{if isEq $selectedDZ "Lippo Cikarang"}}selected{{end}}>Lippo Cikarang</option>
-                  <option value="KBI" {{if isEq $selectedDZ "KBI"}}selected{{end}}>KBI</option>
-                  <option value="BIP" {{if isEq $selectedDZ "BIP"}}selected{{end}}>BIP</option>
-                  <option value="Lion Industrial Park" {{if isEq $selectedDZ "Lion Industrial Park"}}selected{{end}}>Lion Industrial Park</option>
-                  <option value="JISC" {{if isEq $selectedDZ "JISC"}}selected{{end}}>JISC</option>
-                  <option value="JIEP" {{if isEq $selectedDZ "JIEP"}}selected{{end}}>JIEP</option>
-                  <option value="KBN Marunda" {{if isEq $selectedDZ "KBN Marunda"}}selected{{end}}>KBN Marunda</option>
-                  <option value="KBN Cakung" {{if isEq $selectedDZ "KBN Cakung"}}selected{{end}}>KBN Cakung</option>
-                  <option value="Jakarta" {{if isEq $selectedDZ "Jakarta"}}selected{{end}}>Jakarta</option>
-                  <option value="Purwakarta" {{if isEq $selectedDZ "Purwakarta"}}selected{{end}}>Purwakarta</option>
-                  <option value="Other" {{if isEq $selectedDZ "Other"}}selected{{end}}>Other (Lainnya)</option>
-                </select>
-              </div>
-
-              <!-- Departure Zone Name (dynamic text field) -->
-              <div id="departure_zone_name_container" class="{{if not (isEq (index .Form "departure_zone") "Other")}}hidden{{end}}">
-                <label for="departure_zone_name" class="form-label">Nama Zona Keberangkatan (Lainnya)<span class="req">*</span></label>
-                <input type="text" id="departure_zone_name" name="departure_zone_name"
-                       value="{{index .Form "departure_zone_name"}}"
-                       placeholder="Masukkan nama zona keberangkatan"
-                       class="form-input"/>
-              </div>
 
               <!-- Own Vehicle -->
               <div>
                 <label for="own_vehicle" class="form-label">Membawa Kendaraan Sendiri?<span class="req">*</span></label>
-                <select id="own_vehicle" name="own_vehicle" class="form-input" onchange="toggleVehicleDetails()">
+                <select id="own_vehicle" name="own_vehicle" class="form-input" onchange="toggleVehicleDetails(); toggleCarpoolDetails();">
                   <option value="">-- Pilih Jawaban --</option>
                   {{$ov := index .Form "own_vehicle"}}
                   <option value="true" {{if isEq $ov "true"}}selected{{end}}>Ya (Membawa Kendaraan)</option>
@@ -546,7 +502,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label for="vehicle_type" class="form-label">Jenis Kendaraan<span class="req">*</span></label>
-                    <select id="vehicle_type" name="vehicle_type" class="form-input">
+                    <select id="vehicle_type" name="vehicle_type" class="form-input" onchange="toggleCarpoolDetails();">
                       <option value="">-- Pilih Jenis --</option>
                       {{$vt := index .Form "vehicle_type"}}
                       <option value="Car" {{if isEq $vt "Car"}}selected{{end}}>Mobil (Car)</option>
@@ -574,16 +530,52 @@
                 </div>
 
                 <!-- Available Seats (shown if carpool_can_bring = true) -->
-                <div id="carpool_details_container" class="{{if not (isEq (index .Form "carpool_can_bring") "true")}}hidden{{end}}">
-                  <label for="carpool_seats" class="form-label">Jumlah Kursi Kosong yang Tersedia<span class="req">*</span></label>
-                  <select id="carpool_seats" name="carpool_seats" class="form-input">
-                    <option value="">-- Pilih Jumlah Kursi --</option>
-                    {{$seats := index .Form "carpool_seats"}}
-                    <option value="1" {{if isEq $seats "1"}}selected{{end}}>1 Kursi</option>
-                    <option value="2" {{if isEq $seats "2"}}selected{{end}}>2 Kursi</option>
-                    <option value="3" {{if isEq $seats "3"}}selected{{end}}>3 Kursi</option>
-                    <option value="4" {{if isEq $seats "4"}}selected{{end}}>4 Kursi</option>
-                  </select>
+                <div id="carpool_details_container" class="{{if not (isEq (index .Form "carpool_can_bring") "true")}}hidden{{end}} space-y-4">
+                  <div>
+                    <label for="carpool_seats" class="form-label">Jumlah Kursi Kosong yang Tersedia<span class="req">*</span></label>
+                    <select id="carpool_seats" name="carpool_seats" class="form-input">
+                      <option value="">-- Pilih Jumlah Kursi --</option>
+                      {{$seats := index .Form "carpool_seats"}}
+                      <option value="1" {{if isEq $seats "1"}}selected{{end}}>1 Kursi</option>
+                      <option value="2" {{if isEq $seats "2"}}selected{{end}}>2 Kursi</option>
+                      <option value="3" {{if isEq $seats "3"}}selected{{end}}>3 Kursi</option>
+                      <option value="4" {{if isEq $seats "4"}}selected{{end}}>4 Kursi</option>
+                    </select>
+                  </div>
+
+                  <!-- Meeting Point -->
+                  <div>
+                    <label for="transport_meeting_point" class="form-label">Titik Kumpul (Meeting Point)<span class="req">*</span></label>
+                    <input type="text" id="transport_meeting_point" name="transport_meeting_point"
+                           value="{{index .Form "transport_meeting_point"}}"
+                           placeholder="Contoh: MM2100 Gate 3, Rest Area KM 19, AEON Deltamas"
+                           class="form-input"/>
+                  </div>
+
+                  <!-- Departure Notes (Optional) -->
+                  <div>
+                    <label for="transport_notes" class="form-label">Catatan Keberangkatan (Opsional)</label>
+                    <input type="text" id="transport_notes" name="transport_notes"
+                           value="{{index .Form "transport_notes"}}"
+                           placeholder="Contoh: Berangkat jam 06:30, harap datang 15 menit lebih awal"
+                           class="form-input"/>
+                  </div>
+
+                  <!-- Volunteer Disclaimer & Agreement -->
+                  <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mt-3">
+                    <p class="text-xs text-amber-300 leading-relaxed mb-3">
+                      Anda bersedia membantu transportasi peserta lain sesuai koordinasi panitia.
+                      Panitia dapat memberikan kompensasi transportasi kepada pengemudi yang ditunjuk. Detail kompensasi akan diinformasikan secara terpisah oleh panitia.
+                    </p>
+                    <div class="flex items-start gap-2.5">
+                      <input type="checkbox" id="transport_agreement" name="transport_agreement" value="true"
+                             {{if isEq (index .Form "transport_agreement") "true"}}checked{{end}}
+                             class="w-4 h-4 mt-0.5 rounded border-white/10 bg-white/5 text-indigo-600 focus:ring-indigo-500" />
+                      <label for="transport_agreement" class="text-xs text-white/80 select-none cursor-pointer leading-normal">
+                        Saya memahami bahwa penugasan transportasi dan kompensasi sepenuhnya ditentukan oleh panitia. <span class="text-red-400 font-bold">*</span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -805,40 +797,32 @@
   };
 
   window.toggleCarpoolDetails = function() {
-    const el = document.getElementById('carpool_can_bring');
-    if (!el) return;
-    let isChecked = false;
-    if (el.tagName === 'INPUT' && el.type === 'checkbox') {
-      isChecked = el.checked;
-    } else if (el.tagName === 'SELECT') {
-      isChecked = el.value === 'true';
-    }
+    const ownVehicleEl = document.getElementById('own_vehicle');
+    const vehicleTypeEl = document.getElementById('vehicle_type');
+    const carpoolCanBringEl = document.getElementById('carpool_can_bring');
+    
+    const isOwnVehicle = ownVehicleEl && ownVehicleEl.value === 'true';
+    const isCar = vehicleTypeEl && vehicleTypeEl.value === 'Car';
+    const isCanBring = carpoolCanBringEl && carpoolCanBringEl.value === 'true';
+    
+    const isVisible = isOwnVehicle && isCar && isCanBring;
+    
     const container = document.getElementById('carpool_details_container');
     const seatsInput = document.getElementById('carpool_seats');
+    const meetingPointInput = document.getElementById('transport_meeting_point');
+    const agreementCheckbox = document.getElementById('transport_agreement');
+    
     if (!container) return;
-    if (isChecked) {
+    if (isVisible) {
       container.classList.remove('hidden');
       if (seatsInput) seatsInput.required = true;
+      if (meetingPointInput) meetingPointInput.required = true;
+      if (agreementCheckbox) agreementCheckbox.required = true;
     } else {
       container.classList.add('hidden');
       if (seatsInput) { seatsInput.required = false; seatsInput.value = ''; }
-    }
-  };
-
-  window.toggleDepartureZoneName = function() {
-    const el = document.getElementById('departure_zone');
-    if (!el) return;
-    const val = el.value;
-    const container = document.getElementById('departure_zone_name_container');
-    const input = document.getElementById('departure_zone_name');
-    if (!container || !input) return;
-    if (val === 'Other') {
-      container.classList.remove('hidden');
-      input.required = true;
-    } else {
-      container.classList.add('hidden');
-      input.required = false;
-      input.value = '';
+      if (meetingPointInput) { meetingPointInput.required = false; meetingPointInput.value = ''; }
+      if (agreementCheckbox) { agreementCheckbox.required = false; agreementCheckbox.checked = false; }
     }
   };
 
@@ -846,7 +830,6 @@
     toggleIndustrialEstateName();
     toggleVehicleDetails();
     toggleCarpoolDetails();
-    toggleDepartureZoneName();
   }
 
   // Run on page load

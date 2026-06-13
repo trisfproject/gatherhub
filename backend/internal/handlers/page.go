@@ -161,8 +161,9 @@ func (h *PageHandler) RegisterSubmit(c *fiber.Ctx) error {
 		CarpoolCanBring:      c.FormValue("carpool_can_bring"),
 		CarpoolSeats:          c.FormValue("carpool_seats"),
 		TShirtSize:            c.FormValue("tshirt_size"),
-		DepartureZone:         c.FormValue("departure_zone"),
-		DepartureZoneName:     c.FormValue("departure_zone_name"),
+		TransportAgreement:    c.FormValue("transport_agreement"),
+		TransportMeetingPoint: c.FormValue("transport_meeting_point"),
+		TransportNotes:        c.FormValue("transport_notes"),
 	}
 
 	// Collect validation errors
@@ -400,8 +401,9 @@ func formToMap(form *services.RegisterForm) map[string]string {
 		"carpool_can_bring":      form.CarpoolCanBring,
 		"carpool_seats":          form.CarpoolSeats,
 		"tshirt_size":            form.TShirtSize,
-		"departure_zone":         form.DepartureZone,
-		"departure_zone_name":    form.DepartureZoneName,
+		"transport_meeting_point": form.TransportMeetingPoint,
+		"transport_notes":         form.TransportNotes,
+		"transport_agreement":     form.TransportAgreement,
 	}
 }
 

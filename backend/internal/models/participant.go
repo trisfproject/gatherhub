@@ -47,10 +47,25 @@ type Participant struct {
 	TransportMeetingPoint string         `json:"transport_meeting_point" gorm:"size:255"`
 	TransportDepartureTime string        `json:"transport_departure_time" gorm:"size:255"`
 	TransportNotes     string            `json:"transport_notes" gorm:"type:text"`
+	OfficialDriver     bool              `json:"official_driver" gorm:"default:false"`
 	CreatedAt          time.Time         `json:"created_at" gorm:"index"`
 	UpdatedAt          time.Time         `json:"updated_at"`
 
 	// Associations
 	Event Event `json:"event,omitempty" gorm:"foreignKey:EventID"`
 	Driver *Participant `json:"driver,omitempty" gorm:"foreignKey:DriverID;references:ID"`
+}
+
+// GetTransportationStatus returns the active transportation role/status
+func (p *Participant) GetTransportationStatus() string {
+	if p.OfficialDriver {
+		return "Official Driver"
+	}
+	if p.OwnVehicle && (p.VehicleType == "Car" || p.VehicleType == "Mobil") && p.CarpoolCanBring {
+		return "Volunteer Driver"
+	}
+	if p.DriverID != nil {
+		return "Passenger"
+	}
+	return "Not Participating"
 }

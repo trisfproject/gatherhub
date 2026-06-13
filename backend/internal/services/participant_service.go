@@ -45,8 +45,9 @@ type RegisterForm struct {
 	CarpoolCanBring      string `form:"carpool_can_bring"`
 	CarpoolSeats         string `form:"carpool_seats"`
 	TShirtSize           string `form:"tshirt_size"`
-	DepartureZone        string `form:"departure_zone"`
-	DepartureZoneName    string `form:"departure_zone_name"`
+	TransportAgreement   string `form:"transport_agreement"`
+	TransportMeetingPoint string `form:"transport_meeting_point"`
+	TransportNotes        string `form:"transport_notes"`
 }
 
 // ParticipantStats holds dashboard counts by status
@@ -166,15 +167,6 @@ func (f *RegisterForm) Validate(event *models.Event) []string {
 	}
 
 	if event.EnableTransportationCoordination {
-		dz := strings.TrimSpace(f.DepartureZone)
-		if dz == "" {
-			errs = append(errs, "Zona Keberangkatan wajib dipilih")
-		} else if dz == "Other" {
-			if strings.TrimSpace(f.DepartureZoneName) == "" {
-				errs = append(errs, "Nama Zona Keberangkatan wajib diisi jika memilih Other")
-			}
-		}
-
 		if f.OwnVehicle != "true" && f.OwnVehicle != "false" {
 			errs = append(errs, "Status kepemilikan kendaraan wajib dipilih")
 		} else if f.OwnVehicle == "true" {
@@ -188,9 +180,18 @@ func (f *RegisterForm) Validate(event *models.Event) []string {
 			if f.CarpoolCanBring != "true" && f.CarpoolCanBring != "false" {
 				errs = append(errs, "Pertanyaan tawaran tumpangan wajib dijawab")
 			} else if f.CarpoolCanBring == "true" {
-				seats, err := strconv.Atoi(f.CarpoolSeats)
-				if err != nil || seats < 1 || seats > 4 {
-					errs = append(errs, "Jumlah Kursi Tersedia wajib dipilih antara 1 sampai 4")
+				// Only cars can have carpools
+				if vt == "Car" {
+					if strings.TrimSpace(f.TransportMeetingPoint) == "" {
+						errs = append(errs, "Titik Kumpul (Meeting Point) wajib diisi")
+					}
+					seats, err := strconv.Atoi(f.CarpoolSeats)
+					if err != nil || seats < 1 || seats > 4 {
+						errs = append(errs, "Jumlah Kursi Tersedia wajib dipilih antara 1 sampai 4")
+					}
+					if f.TransportAgreement != "true" {
+						errs = append(errs, "Anda wajib menyetujui pernyataan kesediaan membantu transportasi peserta lain")
+					}
 				}
 			}
 		}
@@ -267,8 +268,8 @@ func (s *ParticipantService) Create(eventID uint, form *RegisterForm, paymentFil
 		TShirtSize:            strings.TrimSpace(form.TShirtSize),
 		PaymentProof:          paymentFilename,
 		Status:                models.StatusPending,
-		DepartureZone:         strings.TrimSpace(form.DepartureZone),
-		DepartureZoneName:     strings.TrimSpace(form.DepartureZoneName),
+		TransportMeetingPoint: strings.TrimSpace(form.TransportMeetingPoint),
+		TransportNotes:        strings.TrimSpace(form.TransportNotes),
 	}
 
 	if strings.TrimSpace(form.JobTitle) != "" {
@@ -306,7 +307,7 @@ func (s *ParticipantService) GetByID(id uint) (*models.Participant, error) {
 func (s *ParticipantService) GetAllForAdmin(statusFilter, search string) ([]models.Participant, error) {
 	var participants []models.Participant
 
-	q := s.db.Preload("Event").Order("created_at DESC")
+	q := s.db.Preload("Event").Preload("Driver").Order("created_at DESC")
 
 	if statusFilter != "" {
 		q = q.Where("status = ?", statusFilter)

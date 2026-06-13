@@ -706,6 +706,34 @@ func (h *AdminHandler) ExportParticipants(c *fiber.Ctx) error {
 		cols = append(cols, colDef{"T-Shirt Size", 14, func(p *models.Participant) interface{} { return p.TShirtSize }})
 	}
 
+	if event.EnableTransportationCoordination {
+		cols = append(cols, colDef{"Transportation Status", 24, func(p *models.Participant) interface{} { return p.GetTransportationStatus() }})
+		cols = append(cols, colDef{"Official Driver", 18, func(p *models.Participant) interface{} {
+			if p.OfficialDriver {
+				return "Yes"
+			}
+			return "No"
+		}})
+		cols = append(cols, colDef{"Meeting Point", 24, func(p *models.Participant) interface{} {
+			if p.OwnVehicle && p.VehicleType == "Car" && p.CarpoolCanBring {
+				return p.TransportMeetingPoint
+			}
+			if p.DriverID != nil && p.Driver != nil {
+				return p.Driver.TransportMeetingPoint
+			}
+			return "–"
+		}})
+		cols = append(cols, colDef{"Departure Notes", 30, func(p *models.Participant) interface{} {
+			if p.OwnVehicle && p.VehicleType == "Car" && p.CarpoolCanBring {
+				return p.TransportNotes
+			}
+			if p.DriverID != nil && p.Driver != nil {
+				return p.Driver.TransportNotes
+			}
+			return "–"
+		}})
+	}
+
 	// Status and Registration Date
 	cols = append(cols, colDef{"Status", 14, func(p *models.Participant) interface{} {
 		statusLabel := string(p.Status)
@@ -2918,7 +2946,6 @@ type AdminTransportationData struct {
 	Drivers         []DriverInfo
 	Passengers      []models.Participant
 	AllDrivers      []models.Participant
-	ZoneFilter      string
 	StatusFilter    string
 	SearchQuery     string
 	TotalSeats      int
@@ -2965,7 +2992,6 @@ func (h *AdminHandler) TransportationCoordination(c *fiber.Ctx) error {
 	}
 
 	// Filters for Passengers Pool
-	zoneFilter := strings.TrimSpace(c.Query("zone"))
 	statusFilter := strings.TrimSpace(c.Query("status"))
 	searchQuery := strings.TrimSpace(c.Query("q"))
 
@@ -2974,9 +3000,6 @@ func (h *AdminHandler) TransportationCoordination(c *fiber.Ctx) error {
 		Where("event_id = ? AND status IN ('VERIFIED', 'CHECKED_IN')", event.ID).
 		Where("NOT (own_vehicle = ? AND (vehicle_type = ? OR vehicle_type = ?) AND carpool_can_bring = ?)", true, "Car", "Mobil", true)
 
-	if zoneFilter != "" {
-		qPassengers = qPassengers.Where("departure_zone = ?", zoneFilter)
-	}
 	if statusFilter == "assigned" {
 		qPassengers = qPassengers.Where("driver_id IS NOT NULL")
 	} else if statusFilter == "unassigned" {
@@ -3012,7 +3035,6 @@ func (h *AdminHandler) TransportationCoordination(c *fiber.Ctx) error {
 		Drivers:         drivers,
 		Passengers:      passengers,
 		AllDrivers:      driverParticipants,
-		ZoneFilter:      zoneFilter,
 		StatusFilter:    statusFilter,
 		SearchQuery:     searchQuery,
 		TotalSeats:      totalSeats,
@@ -3114,8 +3136,8 @@ func (h *AdminHandler) UpdateDriverDetails(c *fiber.Ctx) error {
 	}
 
 	meetingPoint := strings.TrimSpace(c.FormValue("meeting_point"))
-	departureTime := strings.TrimSpace(c.FormValue("departure_time"))
 	notes := strings.TrimSpace(c.FormValue("notes"))
+	officialDriver := c.FormValue("official_driver") == "true"
 
 	// Fetch driver
 	var driver models.Participant
@@ -3124,8 +3146,8 @@ func (h *AdminHandler) UpdateDriverDetails(c *fiber.Ctx) error {
 	}
 
 	driver.TransportMeetingPoint = meetingPoint
-	driver.TransportDepartureTime = departureTime
 	driver.TransportNotes = notes
+	driver.OfficialDriver = officialDriver
 
 	if err := h.participantService.GetDB().Save(&driver).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString("Gagal menyimpan detail keberangkatan: " + err.Error())
@@ -3133,7 +3155,11 @@ func (h *AdminHandler) UpdateDriverDetails(c *fiber.Ctx) error {
 
 	// Log audit trail
 	adminUser, _ := c.Locals("admin_username").(string)
-	_ = h.auditLogService.Log(adminUser, "UPDATE_DRIVER_DETAILS", "PARTICIPANT", driver.ID, nil, map[string]string{"meeting_point": meetingPoint, "departure_time": departureTime, "notes": notes}, c.IP(), c.Get("User-Agent"))
+	_ = h.auditLogService.Log(adminUser, "UPDATE_DRIVER_DETAILS", "PARTICIPANT", driver.ID, nil, map[string]string{
+		"meeting_point":   meetingPoint,
+		"notes":           notes,
+		"official_driver": strconv.FormatBool(officialDriver),
+	}, c.IP(), c.Get("User-Agent"))
 
 	if c.Get("HX-Request") == "true" {
 		c.Set("HX-Refresh", "true")
@@ -3208,12 +3234,6 @@ func (h *AdminHandler) ExportTransportation(c *fiber.Ctx) error {
 	cols := []colDef{
 		{"Participant", 24, func(p *models.Participant) string { return p.FullName }},
 		{"WhatsApp", 18, func(p *models.Participant) string { return p.Phone }},
-		{"Departure Zone", 24, func(p *models.Participant) string {
-			if p.DepartureZone == "Other" {
-				return fmt.Sprintf("Other (%s)", p.DepartureZoneName)
-			}
-			return p.DepartureZone
-		}},
 		{"Driver", 24, func(p *models.Participant) string {
 			if p.OwnVehicle && p.VehicleType == "Car" && p.CarpoolCanBring {
 				return "Self (Driver)"
@@ -3250,14 +3270,23 @@ func (h *AdminHandler) ExportTransportation(c *fiber.Ctx) error {
 			}
 			return "–"
 		}},
-		{"Departure Time", 18, func(p *models.Participant) string {
+		{"Departure Notes", 30, func(p *models.Participant) string {
 			if p.OwnVehicle && p.VehicleType == "Car" && p.CarpoolCanBring {
-				return p.TransportDepartureTime
+				return p.TransportNotes
 			}
 			if p.DriverID != nil && p.Driver != nil {
-				return p.Driver.TransportDepartureTime
+				return p.Driver.TransportNotes
 			}
 			return "–"
+		}},
+		{"Transportation Status", 24, func(p *models.Participant) string {
+			return p.GetTransportationStatus()
+		}},
+		{"Official Driver", 18, func(p *models.Participant) string {
+			if p.OfficialDriver {
+				return "Yes"
+			}
+			return "No"
 		}},
 	}
 

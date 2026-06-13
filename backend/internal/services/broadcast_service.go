@@ -41,6 +41,12 @@ func (s *BroadcastService) GetRecipientsQuery(eventID uint, group string, city, 
 		q = q.Where("participants.status = ?", models.StatusPending)
 	case "CHECKED_IN":
 		q = q.Where("participants.status = ?", models.StatusCheckedIn)
+	case "OFFICIAL_DRIVERS":
+		q = q.Where("participants.status IN ('VERIFIED', 'CHECKED_IN') AND participants.official_driver = ?", true)
+	case "VOLUNTEER_DRIVERS":
+		q = q.Where("participants.status IN ('VERIFIED', 'CHECKED_IN') AND participants.own_vehicle = ? AND (participants.vehicle_type = ? OR participants.vehicle_type = ?) AND participants.carpool_can_bring = ? AND participants.official_driver = ?", true, "Car", "Mobil", true, false)
+	case "PASSENGERS":
+		q = q.Where("participants.status IN ('VERIFIED', 'CHECKED_IN') AND participants.driver_id IS NOT NULL")
 	}
 
 	// Additional search filters (case-insensitive LIKE matching)
@@ -102,17 +108,19 @@ func (s *BroadcastService) RenderTemplate(msgTmpl string, p *models.Participant)
 	res = strings.ReplaceAll(res, "{{registration_number}}", p.RegistrationNumber)
 	res = strings.ReplaceAll(res, "{{event_title}}", p.Event.Title)
 
-	var driverName, vehiclePlate, meetingPoint, departureTime string
+	var driverName, vehiclePlate, meetingPoint, departureTime, departureNotes string
 	if p.OwnVehicle && p.VehicleType == "Car" && p.CarpoolCanBring {
 		driverName = p.FullName
 		vehiclePlate = p.LicensePlate
 		meetingPoint = p.TransportMeetingPoint
 		departureTime = p.TransportDepartureTime
+		departureNotes = p.TransportNotes
 	} else if p.DriverID != nil && p.Driver != nil {
 		driverName = p.Driver.FullName
 		vehiclePlate = p.Driver.LicensePlate
 		meetingPoint = p.Driver.TransportMeetingPoint
 		departureTime = p.Driver.TransportDepartureTime
+		departureNotes = p.Driver.TransportNotes
 	}
 
 	if driverName == "" {
@@ -127,11 +135,15 @@ func (s *BroadcastService) RenderTemplate(msgTmpl string, p *models.Participant)
 	if departureTime == "" {
 		departureTime = "–"
 	}
+	if departureNotes == "" {
+		departureNotes = "–"
+	}
 
 	res = strings.ReplaceAll(res, "{{driver_name}}", driverName)
 	res = strings.ReplaceAll(res, "{{vehicle_plate}}", vehiclePlate)
 	res = strings.ReplaceAll(res, "{{meeting_point}}", meetingPoint)
 	res = strings.ReplaceAll(res, "{{departure_time}}", departureTime)
+	res = strings.ReplaceAll(res, "{{departure_notes}}", departureNotes)
 
 	return res
 }

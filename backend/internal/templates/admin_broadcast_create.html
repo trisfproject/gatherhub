@@ -93,6 +93,9 @@
                   <option value="VERIFIED">Terverifikasi (Verified)</option>
                   <option value="PENDING">Pending Approval</option>
                   <option value="CHECKED_IN">Sudah Hadir (Checked-In)</option>
+                  <option value="OFFICIAL_DRIVERS">Driver Resmi (Official Drivers)</option>
+                  <option value="VOLUNTEER_DRIVERS">Driver Sukarelawan (Volunteer Drivers)</option>
+                  <option value="PASSENGERS">Penumpang (Passengers)</option>
                 </select>
               </div>
             </div>
@@ -131,7 +134,16 @@
                   <span class="bg-white/5 px-2.5 py-1 rounded border border-white/10 font-mono select-all">{{"{{driver_name}}"}}</span>
                   <span class="bg-white/5 px-2.5 py-1 rounded border border-white/10 font-mono select-all">{{"{{vehicle_plate}}"}}</span>
                   <span class="bg-white/5 px-2.5 py-1 rounded border border-white/10 font-mono select-all">{{"{{meeting_point}}"}}</span>
-                  <span class="bg-white/5 px-2.5 py-1 rounded border border-white/10 font-mono select-all">{{"{{departure_time}}"}}</span>
+                  <span class="bg-white/5 px-2.5 py-1 rounded border border-white/10 font-mono select-all">{{"{{departure_notes}}"}}</span>
+                </div>
+                
+                <div class="mt-4 border-t border-white/5 pt-4">
+                  <label class="block text-xs font-bold text-white/40 uppercase mb-2">Preset Template Pengumuman</label>
+                  <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="loadTemplate('official_driver')" class="bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] py-1.5 px-3 rounded-lg transition-all font-bold uppercase tracking-wider">
+                      Penunjukan Driver Resmi
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -183,6 +195,20 @@
     </div>
   </div>
 </div>
+<script>
+  function loadTemplate(type) {
+    if (type === 'official_driver') {
+      const titleInput = document.querySelector('input[name="title"]');
+      const msgTextarea = document.querySelector('textarea[name="message"]');
+      if (titleInput) titleInput.value = "Penunjukan Driver Resmi";
+      if (msgTextarea) {
+        msgTextarea.value = "Terima kasih telah bersedia membantu transportasi peserta.\n\nAnda telah ditunjuk sebagai driver resmi untuk acara ini.\n\nInformasi penumpang dan titik kumpul akan diinformasikan oleh panitia.";
+        // Trigger a change event so preview button or any htmx/js updates pick it up
+        msgTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+  }
+</script>
 </body>
 </html>
 
