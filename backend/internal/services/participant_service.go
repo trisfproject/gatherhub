@@ -6,6 +6,7 @@ import (
 	"mime/multipart"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,14 +27,24 @@ func NewParticipantService(db *gorm.DB, storageService *StorageService) *Partici
 
 // RegisterForm holds registration input data
 type RegisterForm struct {
-	FullName         string `form:"full_name"`
-	Phone            string `form:"phone"`
-	Email            string `form:"email"`
-	City             string `form:"city"`
-	CompanyName      string `form:"company_name"`
-	IndustrialEstate string `form:"industrial_estate"`
-	TelegramUsername string `form:"telegram_username"`
-	JobTitle         string `form:"job_title"` // optional
+	FullName             string `form:"full_name"`
+	Phone                string `form:"phone"`
+	Email                string `form:"email"`
+	City                 string `form:"city"`
+	CompanyName          string `form:"company_name"`
+	IndustrialEstate     string `form:"industrial_estate"`
+	IndustrialEstateName string `form:"industrial_estate_name"`
+	TelegramUsername     string `form:"telegram_username"`
+	JobTitle             string `form:"job_title"` // optional
+	EmergencyName        string `form:"emergency_name"`
+	EmergencyRelationship string `form:"emergency_relationship"`
+	EmergencyPhone       string `form:"emergency_phone"`
+	OwnVehicle           string `form:"own_vehicle"`
+	VehicleType          string `form:"vehicle_type"`
+	LicensePlate         string `form:"license_plate"`
+	CarpoolCanBring      string `form:"carpool_can_bring"`
+	CarpoolSeats         string `form:"carpool_seats"`
+	TShirtSize           string `form:"tshirt_size"`
 }
 
 // ParticipantStats holds dashboard counts by status
@@ -52,7 +63,7 @@ var phoneRegex = regexp.MustCompile(`^(\+62|62|0)[0-9]{8,13}$`)
 
 // Validate performs comprehensive validation on the form.
 // Returns a slice of Indonesian-language error messages.
-func (f *RegisterForm) Validate() []string {
+func (f *RegisterForm) Validate(event *models.Event) []string {
 	var errs []string
 
 	if strings.TrimSpace(f.FullName) == "" {
@@ -81,11 +92,75 @@ func (f *RegisterForm) Validate() []string {
 	if strings.TrimSpace(f.CompanyName) == "" {
 		errs = append(errs, "Nama Perusahaan wajib diisi")
 	}
-	if strings.TrimSpace(f.IndustrialEstate) == "" {
-		errs = append(errs, "Kawasan Industri wajib diisi")
+
+	// ── Conditional Validations based on Event Config ──
+	if event.EnableIndustrialEstate {
+		ie := strings.TrimSpace(f.IndustrialEstate)
+		if ie == "" {
+			errs = append(errs, "Kawasan Industri wajib dipilih")
+		} else if ie == "Other" {
+			if strings.TrimSpace(f.IndustrialEstateName) == "" {
+				errs = append(errs, "Nama Kawasan Industri wajib diisi jika memilih Other")
+			}
+		}
 	}
-	if strings.TrimSpace(f.TelegramUsername) == "" {
-		errs = append(errs, "Username Telegram wajib diisi")
+
+	if event.EnableTelegram {
+		if strings.TrimSpace(f.TelegramUsername) == "" {
+			errs = append(errs, "Username Telegram wajib diisi")
+		}
+	}
+
+	if event.EnableJobTitle {
+		if strings.TrimSpace(f.JobTitle) == "" {
+			errs = append(errs, "Jabatan / Posisi wajib diisi")
+		}
+	}
+
+	if event.EnableEmergencyContact {
+		if strings.TrimSpace(f.EmergencyName) == "" {
+			errs = append(errs, "Nama Kontak Darurat wajib diisi")
+		}
+		if strings.TrimSpace(f.EmergencyRelationship) == "" {
+			errs = append(errs, "Hubungan Kontak Darurat wajib diisi")
+		}
+		if strings.TrimSpace(f.EmergencyPhone) == "" {
+			errs = append(errs, "Nomor Telepon Kontak Darurat wajib diisi")
+		} else if !phoneRegex.MatchString(strings.TrimSpace(f.EmergencyPhone)) {
+			errs = append(errs, "Format Nomor Telepon Kontak Darurat tidak valid")
+		}
+	}
+
+	if event.EnableVehicleInfo {
+		if f.OwnVehicle == "true" {
+			if strings.TrimSpace(f.VehicleType) == "" {
+				errs = append(errs, "Jenis Kendaraan wajib dipilih")
+			}
+			if strings.TrimSpace(f.LicensePlate) == "" {
+				errs = append(errs, "Nomor Polisi (Plat Nomor) wajib diisi")
+			}
+		}
+	}
+
+	if event.EnableCarpool {
+		if f.CarpoolCanBring == "true" {
+			seats, err := strconv.Atoi(f.CarpoolSeats)
+			if err != nil || seats <= 0 {
+				errs = append(errs, "Jumlah Kursi Tersedia wajib diisi dengan angka positif")
+			}
+		}
+	}
+
+	if event.EnableTShirtSize {
+		ts := strings.TrimSpace(f.TShirtSize)
+		if ts == "" {
+			errs = append(errs, "Ukuran T-Shirt wajib dipilih")
+		} else {
+			validSizes := map[string]bool{"XS": true, "S": true, "M": true, "L": true, "XL": true, "XXL": true, "XXXL": true}
+			if !validSizes[ts] {
+				errs = append(errs, "Ukuran T-Shirt tidak valid")
+			}
+		}
 	}
 
 	return errs
@@ -118,15 +193,13 @@ func (s *ParticipantService) SavePaymentProof(file *multipart.FileHeader) (strin
 	return s.storageService.SavePaymentProof(file)
 }
 
-// generateRegistrationNumber creates a unique GH-YYYY-NNNN registration number
 func (s *ParticipantService) generateRegistrationNumber() (string, error) {
-	year := time.Now().Year()
-	prefix := fmt.Sprintf("GH-%d-", year)
-
+	prefix := "GH-" + time.Now().Format("2006") + "-"
 	var count int64
-	if err := s.db.Model(&models.Participant{}).
+	err := s.db.Model(&models.Participant{}).
 		Where("registration_number LIKE ?", prefix+"%").
-		Count(&count).Error; err != nil {
+		Count(&count).Error
+	if err != nil {
 		return "", fmt.Errorf("gagal menghitung nomor registrasi: %w", err)
 	}
 
@@ -141,21 +214,37 @@ func (s *ParticipantService) Create(eventID uint, form *RegisterForm, paymentFil
 	}
 
 	participant := &models.Participant{
-		EventID:            eventID,
-		RegistrationNumber: regNumber,
-		FullName:           strings.TrimSpace(form.FullName),
-		Phone:              strings.TrimSpace(form.Phone),
-		Email:              strings.TrimSpace(strings.ToLower(form.Email)),
-		City:               strings.TrimSpace(form.City),
-		CompanyName:        strings.TrimSpace(form.CompanyName),
-		IndustrialEstate:   strings.TrimSpace(form.IndustrialEstate),
-		TelegramUsername:   strings.TrimSpace(form.TelegramUsername),
-		PaymentProof:       paymentFilename,
-		Status:             models.StatusPending,
+		EventID:               eventID,
+		RegistrationNumber:    regNumber,
+		FullName:              strings.TrimSpace(form.FullName),
+		Phone:                 strings.TrimSpace(form.Phone),
+		Email:                 strings.TrimSpace(strings.ToLower(form.Email)),
+		City:                  strings.TrimSpace(form.City),
+		CompanyName:           strings.TrimSpace(form.CompanyName),
+		IndustrialEstate:      strings.TrimSpace(form.IndustrialEstate),
+		IndustrialEstateName:  strings.TrimSpace(form.IndustrialEstateName),
+		TelegramUsername:      strings.TrimSpace(form.TelegramUsername),
+		EmergencyName:         strings.TrimSpace(form.EmergencyName),
+		EmergencyRelationship: strings.TrimSpace(form.EmergencyRelationship),
+		EmergencyPhone:        strings.TrimSpace(form.EmergencyPhone),
+		OwnVehicle:            form.OwnVehicle == "true",
+		VehicleType:           strings.TrimSpace(form.VehicleType),
+		LicensePlate:          strings.TrimSpace(form.LicensePlate),
+		CarpoolCanBring:       form.CarpoolCanBring == "true",
+		TShirtSize:            strings.TrimSpace(form.TShirtSize),
+		PaymentProof:          paymentFilename,
+		Status:                models.StatusPending,
 	}
 
-	if jt := strings.TrimSpace(form.JobTitle); jt != "" {
+	if strings.TrimSpace(form.JobTitle) != "" {
+		jt := strings.TrimSpace(form.JobTitle)
 		participant.JobTitle = &jt
+	}
+
+	if form.CarpoolCanBring == "true" {
+		if seats, err := strconv.Atoi(form.CarpoolSeats); err == nil {
+			participant.CarpoolSeats = seats
+		}
 	}
 
 	if err := s.db.Create(participant).Error; err != nil {

@@ -199,6 +199,68 @@
             <input type="datetime-local" name="registration_close" value='{{index .Form "registration_close"}}' class="form-input"/>
           </div>
         </div>
+      <!-- Section 5: Event Registration Configuration -->
+      <div class="glass p-6">
+        <h3 class="text-indigo-300 font-bold text-sm uppercase tracking-wider mb-5 pb-2 border-b border-white/5">Konfigurasi Pendaftaran Acara</h3>
+        <p class="text-white/40 text-xs mb-4">Pilih field pendaftaran mana saja yang ingin diaktifkan untuk acara ini:</p>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label class="flex items-center gap-3 bg-white/3 border border-white/5 p-4 rounded-xl cursor-pointer hover:bg-white/5 transition-colors">
+            <input type="checkbox" name="enable_telegram" value="true" class="w-4 h-4 rounded text-indigo-600 bg-white/5 border-white/10" {{if isEq (index .Form "enable_telegram") "true"}}checked{{end}}/>
+            <div>
+              <p class="text-sm font-semibold text-white">Username Telegram</p>
+              <p class="text-white/40 text-xxs">Minta peserta mengisi ID Telegram</p>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-3 bg-white/3 border border-white/5 p-4 rounded-xl cursor-pointer hover:bg-white/5 transition-colors">
+            <input type="checkbox" name="enable_job_title" value="true" class="w-4 h-4 rounded text-indigo-600 bg-white/5 border-white/10" {{if isEq (index .Form "enable_job_title") "true"}}checked{{end}}/>
+            <div>
+              <p class="text-sm font-semibold text-white">Jabatan / Pekerjaan</p>
+              <p class="text-white/40 text-xxs">Minta peserta mengisi posisi / jabatan pekerjaan</p>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-3 bg-white/3 border border-white/5 p-4 rounded-xl cursor-pointer hover:bg-white/5 transition-colors">
+            <input type="checkbox" name="enable_industrial_estate" value="true" class="w-4 h-4 rounded text-indigo-600 bg-white/5 border-white/10" {{if isEq (index .Form "enable_industrial_estate") "true"}}checked{{end}}/>
+            <div>
+              <p class="text-sm font-semibold text-white">Kawasan Industri</p>
+              <p class="text-white/40 text-xxs">Minta peserta memilih kawasan industri perusahaan</p>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-3 bg-white/3 border border-white/5 p-4 rounded-xl cursor-pointer hover:bg-white/5 transition-colors">
+            <input type="checkbox" name="enable_emergency_contact" value="true" class="w-4 h-4 rounded text-indigo-600 bg-white/5 border-white/10" {{if isEq (index .Form "enable_emergency_contact") "true"}}checked{{end}}/>
+            <div>
+              <p class="text-sm font-semibold text-white">Kontak Darurat</p>
+              <p class="text-white/40 text-xxs">Minta nama, hubungan, dan nomor telepon kontak darurat</p>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-3 bg-white/3 border border-white/5 p-4 rounded-xl cursor-pointer hover:bg-white/5 transition-colors">
+            <input type="checkbox" name="enable_vehicle_info" value="true" class="w-4 h-4 rounded text-indigo-600 bg-white/5 border-white/10" {{if isEq (index .Form "enable_vehicle_info") "true"}}checked{{end}}/>
+            <div>
+              <p class="text-sm font-semibold text-white">Informasi Kendaraan</p>
+              <p class="text-white/40 text-xxs">Minta informasi kepemilikan, jenis kendaraan, dan nomor polisi</p>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-3 bg-white/3 border border-white/5 p-4 rounded-xl cursor-pointer hover:bg-white/5 transition-colors">
+            <input type="checkbox" name="enable_carpool" value="true" class="w-4 h-4 rounded text-indigo-600 bg-white/5 border-white/10" {{if isEq (index .Form "enable_carpool") "true"}}checked{{end}}/>
+            <div>
+              <p class="text-sm font-semibold text-white">Tawaran Tumpangan (Carpool)</p>
+              <p class="text-white/40 text-xxs">Minta opsi pemberian tumpangan dan jumlah kursi</p>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-3 bg-white/3 border border-white/5 p-4 rounded-xl cursor-pointer hover:bg-white/5 transition-colors">
+            <input type="checkbox" name="enable_tshirt_size" value="true" class="w-4 h-4 rounded text-indigo-600 bg-white/5 border-white/10" {{if isEq (index .Form "enable_tshirt_size") "true"}}checked{{end}}/>
+            <div>
+              <p class="text-sm font-semibold text-white">Ukuran T-Shirt</p>
+              <p class="text-white/40 text-xxs">Minta peserta memilih ukuran T-Shirt</p>
+            </div>
+          </label>
+        </div>
       </div>
 
       <!-- Submit Section -->

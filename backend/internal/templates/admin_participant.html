@@ -174,10 +174,12 @@
                 <span class="info-label">Kota</span>
                 <span class="info-value">{{.Participant.City}}</span>
               </div>
+              {{if .Participant.Event.EnableTelegram}}
               <div class="info-row">
                 <span class="info-label">Username Telegram</span>
                 <span class="info-value font-mono text-sm">@{{.Participant.TelegramUsername}}</span>
               </div>
+              {{end}}
             </div>
           </div>
 
@@ -189,17 +191,141 @@
                 <span class="info-label">Perusahaan</span>
                 <span class="info-value">{{.Participant.CompanyName}}</span>
               </div>
+              {{if .Participant.Event.EnableIndustrialEstate}}
               <div class="info-row">
                 <span class="info-label">Kawasan Industri</span>
-                <span class="info-value">{{.Participant.IndustrialEstate}}</span>
+                <span class="info-value">
+                  {{.Participant.IndustrialEstate}}
+                  {{if isEq .Participant.IndustrialEstate "Other"}}
+                    ({{.Participant.IndustrialEstateName}})
+                  {{end}}
+                </span>
               </div>
+              {{end}}
+              {{if .Participant.Event.EnableJobTitle}}
               <div class="info-row">
                 <span class="info-label">Jabatan / Posisi</span>
                 <span class="info-value">{{.Participant.JobTitle | defaultStr "–"}}</span>
               </div>
+              {{end}}
             </div>
           </div>
         </div>
+
+        {{if or .Participant.Event.EnableEmergencyContact .Participant.Event.EnableVehicleInfo .Participant.Event.EnableCarpool .Participant.Event.EnableTShirtSize}}
+        <!-- Additional Info Card -->
+        <div class="glass p-6 mt-5 fade-up">
+          <p class="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-4">Informasi Tambahan Acara</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {{if .Participant.Event.EnableEmergencyContact}}
+            <!-- Emergency Contact Details -->
+            <div class="bg-white/3 rounded-xl p-4 border border-white/6">
+              <p class="text-xs font-bold text-red-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                Kontak Darurat
+              </p>
+              <div class="space-y-2">
+                <div class="flex justify-between border-b border-white/4 pb-2">
+                  <span class="text-xs text-white/45">Nama Kontak</span>
+                  <span class="text-sm font-semibold text-white">{{.Participant.EmergencyName}}</span>
+                </div>
+                <div class="flex justify-between border-b border-white/4 pb-2">
+                  <span class="text-xs text-white/45">Hubungan</span>
+                  <span class="text-sm font-semibold text-white">{{.Participant.EmergencyRelationship}}</span>
+                </div>
+                <div class="flex justify-between pb-1">
+                  <span class="text-xs text-white/45">No. Telepon</span>
+                  <span class="text-sm font-semibold text-white flex items-center gap-1">
+                    {{.Participant.EmergencyPhone}}
+                    <a href="https://wa.me/{{.Participant.EmergencyPhone}}" target="_blank" class="text-emerald-400 hover:text-emerald-300">
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/></svg>
+                    </a>
+                  </span>
+                </div>
+              </div>
+            </div>
+            {{end}}
+
+            {{if .Participant.Event.EnableVehicleInfo}}
+            <!-- Vehicle Info Details -->
+            <div class="bg-white/3 rounded-xl p-4 border border-white/6">
+              <p class="text-xs font-bold text-blue-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                </svg>
+                Informasi Kendaraan
+              </p>
+              <div class="space-y-2">
+                <div class="flex justify-between border-b border-white/4 pb-2">
+                  <span class="text-xs text-white/45">Membawa Kendaraan</span>
+                  <span class="text-sm font-semibold text-white">
+                    {{if .Participant.OwnVehicle}}Ya{{else}}Tidak{{end}}
+                  </span>
+                </div>
+                {{if .Participant.OwnVehicle}}
+                <div class="flex justify-between border-b border-white/4 pb-2">
+                  <span class="text-xs text-white/45">Jenis Kendaraan</span>
+                  <span class="text-sm font-semibold text-white">{{.Participant.VehicleType}}</span>
+                </div>
+                <div class="flex justify-between pb-1">
+                  <span class="text-xs text-white/45">Nomor Polisi</span>
+                  <span class="text-sm font-semibold text-white font-mono uppercase">{{.Participant.LicensePlate}}</span>
+                </div>
+                {{end}}
+              </div>
+            </div>
+            {{end}}
+
+            {{if .Participant.Event.EnableCarpool}}
+            <!-- Carpool Details -->
+            <div class="bg-white/3 rounded-xl p-4 border border-white/6">
+              <p class="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+                Carpool / Tebengan
+              </p>
+              <div class="space-y-2">
+                <div class="flex justify-between border-b border-white/4 pb-2">
+                  <span class="text-xs text-white/45">Bersedia Membawa Peserta</span>
+                  <span class="text-sm font-semibold text-white">
+                    {{if .Participant.CarpoolCanBring}}Ya{{else}}Tidak{{end}}
+                  </span>
+                </div>
+                {{if .Participant.CarpoolCanBring}}
+                <div class="flex justify-between pb-1">
+                  <span class="text-xs text-white/45">Jumlah Kursi Tersedia</span>
+                  <span class="text-sm font-semibold text-white">{{.Participant.CarpoolSeats}} Kursi</span>
+                </div>
+                {{end}}
+              </div>
+            </div>
+            {{end}}
+
+            {{if .Participant.Event.EnableTShirtSize}}
+            <!-- T-Shirt Size Details -->
+            <div class="bg-white/3 rounded-xl p-4 border border-white/6">
+              <p class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                Ukuran T-Shirt
+              </p>
+              <div class="space-y-2">
+                <div class="flex justify-between pb-1">
+                  <span class="text-xs text-white/45">Ukuran</span>
+                  <span class="text-sm font-bold text-white bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-2.5 py-0.5">{{.Participant.TShirtSize}}</span>
+                </div>
+              </div>
+            </div>
+            {{end}}
+
+          </div>
+        </div>
+        {{end}}
 
         <!-- Verification History (HTMX target) -->
         <div id="history-card" class="mt-5">

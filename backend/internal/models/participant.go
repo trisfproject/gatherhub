@@ -25,8 +25,18 @@ type Participant struct {
 	City               string            `json:"city" gorm:"not null;size:100"`
 	CompanyName        string            `json:"company_name" gorm:"size:255"`
 	IndustrialEstate   string            `json:"industrial_estate" gorm:"size:255"`
+	IndustrialEstateName string            `json:"industrial_estate_name" gorm:"size:255"`
 	TelegramUsername   string            `json:"telegram_username" gorm:"size:100"`
 	JobTitle           *string           `json:"job_title" gorm:"size:255"`
+	EmergencyName      string            `json:"emergency_name" gorm:"size:255"`
+	EmergencyRelationship string         `json:"emergency_relationship" gorm:"size:100"`
+	EmergencyPhone     string            `json:"emergency_phone" gorm:"size:20"`
+	OwnVehicle         bool              `json:"own_vehicle" gorm:"default:false"`
+	VehicleType        string            `json:"vehicle_type" gorm:"size:50"`
+	LicensePlate       string            `json:"license_plate" gorm:"size:50"`
+	CarpoolCanBring    bool              `json:"carpool_can_bring" gorm:"default:false"`
+	CarpoolSeats       int               `json:"carpool_seats" gorm:"default:0"`
+	TShirtSize         string            `json:"tshirt_size" gorm:"size:10"`
 	PaymentProof       string            `json:"payment_proof" gorm:"size:500"`
 	Status             ParticipantStatus `json:"status" gorm:"not null;default:PENDING;size:20;index;index:idx_event_status"`
 	VerifiedAt         *time.Time        `json:"verified_at,omitempty"`

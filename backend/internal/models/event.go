@@ -24,6 +24,13 @@ type Event struct {
 	RegistrationOpen     time.Time `json:"registration_open"`
 	RegistrationClose    time.Time `json:"registration_close"`
 	Status               string    `json:"status" gorm:"not null;default:'DRAFT';size:20"`
+	EnableTelegram         bool      `json:"enable_telegram" gorm:"not null;default:false"`
+	EnableJobTitle         bool      `json:"enable_job_title" gorm:"not null;default:false"`
+	EnableIndustrialEstate bool      `json:"enable_industrial_estate" gorm:"not null;default:false"`
+	EnableEmergencyContact bool      `json:"enable_emergency_contact" gorm:"not null;default:false"`
+	EnableVehicleInfo      bool      `json:"enable_vehicle_info" gorm:"not null;default:false"`
+	EnableCarpool          bool      `json:"enable_carpool" gorm:"not null;default:false"`
+	EnableTShirtSize       bool      `json:"enable_tshirt_size" gorm:"not null;default:false"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
 

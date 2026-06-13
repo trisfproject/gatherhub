@@ -590,11 +590,12 @@ func (h *AdminHandler) ExportParticipants(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).SendString("Gagal mengambil data peserta")
 	}
 
-	// Determine event slug for filename
-	eventSlug := "event"
-	if event, err := h.eventService.GetFirst(); err == nil && event != nil {
-		eventSlug = event.Slug
+	// Determine event config and slug for filename
+	event, err := h.eventService.GetFirst()
+	if err != nil || event == nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Acara tidak ditemukan")
 	}
+	eventSlug := event.Slug
 
 	// Build XLSX
 	f := excelize.NewFile()
@@ -627,43 +628,85 @@ func (h *AdminHandler) ExportParticipants(c *fiber.Ctx) error {
 		},
 	})
 
-	// ── Headers ───────────────────────────────────────────────
-	headers := []struct {
-		col   string
-		label string
-		width float64
-	}{
-		{"A", "Registration Number", 20},
-		{"B", "Full Name", 28},
-		{"C", "WhatsApp", 18},
-		{"D", "Email", 30},
-		{"E", "City", 16},
-		{"F", "Company Name", 28},
-		{"G", "Industrial Estate", 24},
-		{"H", "Telegram Username", 20},
-		{"I", "Job Title", 20},
-		{"J", "Status", 14},
-		{"K", "Registration Date", 22},
-	}
-
-	for _, h := range headers {
-		cell := h.col + "1"
-		f.SetCellValue(sheet, cell, h.label)
-		f.SetCellStyle(sheet, cell, cell, headerStyle)
-		f.SetColWidth(sheet, h.col, h.col, h.width)
-	}
-	f.SetRowHeight(sheet, 1, 22)
-
-	// ── Rows ──────────────────────────────────────────────────
-	for i, p := range participants {
-		row := i + 2
-		rowStr := strconv.Itoa(row)
-
-		jobTitle := ""
-		if p.JobTitle != nil {
-			jobTitle = *p.JobTitle
+	// Helper to convert column index (1-based) to Excel letter (e.g. 1 -> A, 27 -> AA)
+	colNumToName := func(col int) string {
+		name := ""
+		for col > 0 {
+			col--
+			name = string(rune('A'+col%26)) + name
+			col /= 26
 		}
+		return name
+	}
 
+	type colDef struct {
+		label    string
+		width    float64
+		getValue func(p *models.Participant) interface{}
+	}
+
+	var cols []colDef
+
+	// Base fields that are always exported
+	cols = append(cols, colDef{"Registration Number", 20, func(p *models.Participant) interface{} { return p.RegistrationNumber }})
+	cols = append(cols, colDef{"Full Name", 28, func(p *models.Participant) interface{} { return p.FullName }})
+	cols = append(cols, colDef{"WhatsApp", 18, func(p *models.Participant) interface{} { return p.Phone }})
+	cols = append(cols, colDef{"Email", 30, func(p *models.Participant) interface{} { return p.Email }})
+	cols = append(cols, colDef{"City", 16, func(p *models.Participant) interface{} { return p.City }})
+	cols = append(cols, colDef{"Company Name", 28, func(p *models.Participant) interface{} { return p.CompanyName }})
+
+	// Configurable fields
+	if event.EnableIndustrialEstate {
+		cols = append(cols, colDef{"Industrial Estate", 24, func(p *models.Participant) interface{} { return p.IndustrialEstate }})
+		cols = append(cols, colDef{"Industrial Estate Name", 24, func(p *models.Participant) interface{} { return p.IndustrialEstateName }})
+	}
+
+	if event.EnableTelegram {
+		cols = append(cols, colDef{"Telegram Username", 20, func(p *models.Participant) interface{} { return p.TelegramUsername }})
+	}
+
+	if event.EnableJobTitle {
+		cols = append(cols, colDef{"Job Title", 20, func(p *models.Participant) interface{} {
+			if p.JobTitle != nil {
+				return *p.JobTitle
+			}
+			return ""
+		}})
+	}
+
+	if event.EnableEmergencyContact {
+		cols = append(cols, colDef{"Emergency Contact Name", 24, func(p *models.Participant) interface{} { return p.EmergencyName }})
+		cols = append(cols, colDef{"Emergency Relationship", 20, func(p *models.Participant) interface{} { return p.EmergencyRelationship }})
+		cols = append(cols, colDef{"Emergency Phone", 18, func(p *models.Participant) interface{} { return p.EmergencyPhone }})
+	}
+
+	if event.EnableVehicleInfo {
+		cols = append(cols, colDef{"Own Vehicle", 14, func(p *models.Participant) interface{} {
+			if p.OwnVehicle {
+				return "Ya"
+			}
+			return "Tidak"
+		}})
+		cols = append(cols, colDef{"Vehicle Type", 16, func(p *models.Participant) interface{} { return p.VehicleType }})
+		cols = append(cols, colDef{"License Plate", 16, func(p *models.Participant) interface{} { return p.LicensePlate }})
+	}
+
+	if event.EnableCarpool {
+		cols = append(cols, colDef{"Can Bring Others", 18, func(p *models.Participant) interface{} {
+			if p.CarpoolCanBring {
+				return "Ya"
+			}
+			return "Tidak"
+		}})
+		cols = append(cols, colDef{"Available Seats", 16, func(p *models.Participant) interface{} { return p.CarpoolSeats }})
+	}
+
+	if event.EnableTShirtSize {
+		cols = append(cols, colDef{"T-Shirt Size", 14, func(p *models.Participant) interface{} { return p.TShirtSize }})
+	}
+
+	// Status and Registration Date
+	cols = append(cols, colDef{"Status", 14, func(p *models.Participant) interface{} {
 		statusLabel := string(p.Status)
 		switch p.Status {
 		case models.StatusVerified:
@@ -673,25 +716,31 @@ func (h *AdminHandler) ExportParticipants(c *fiber.Ctx) error {
 		case models.StatusPending:
 			statusLabel = "PENDING"
 		}
+		return statusLabel
+	}})
+	cols = append(cols, colDef{"Registration Date", 22, func(p *models.Participant) interface{} {
+		return p.CreatedAt.Format("02/01/2006 15:04")
+	}})
 
-		values := []interface{}{
-			p.RegistrationNumber,
-			p.FullName,
-			p.Phone,
-			p.Email,
-			p.City,
-			p.CompanyName,
-			p.IndustrialEstate,
-			p.TelegramUsername,
-			jobTitle,
-			statusLabel,
-			p.CreatedAt.Format("02/01/2006 15:04"),
-		}
+	// ── Set Headers ───────────────────────────────────────────
+	for ci, col := range cols {
+		colLetter := colNumToName(ci + 1)
+		cell := colLetter + "1"
+		f.SetCellValue(sheet, cell, col.label)
+		f.SetCellStyle(sheet, cell, cell, headerStyle)
+		f.SetColWidth(sheet, colLetter, colLetter, col.width)
+	}
+	f.SetRowHeight(sheet, 1, 22)
 
-		cols := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"}
+	// ── Set Rows ──────────────────────────────────────────────
+	for ri, p := range participants {
+		row := ri + 2
+		rowStr := strconv.Itoa(row)
+
 		for ci, col := range cols {
-			cell := col + rowStr
-			f.SetCellValue(sheet, cell, values[ci])
+			colLetter := colNumToName(ci + 1)
+			cell := colLetter + rowStr
+			f.SetCellValue(sheet, cell, col.getValue(&p))
 			f.SetCellStyle(sheet, cell, cell, dataStyle)
 		}
 		f.SetRowHeight(sheet, row, 18)
@@ -708,7 +757,8 @@ func (h *AdminHandler) ExportParticipants(c *fiber.Ctx) error {
 	})
 
 	// ── Auto-filter on header row ─────────────────────────────
-	f.AutoFilter(sheet, "A1:K1", []excelize.AutoFilterOptions{})
+	lastColLetter := colNumToName(len(cols))
+	f.AutoFilter(sheet, "A1:"+lastColLetter+"1", []excelize.AutoFilterOptions{})
 
 	// ── Stream to response ────────────────────────────────────
 	var buf bytes.Buffer
@@ -723,6 +773,7 @@ func (h *AdminHandler) ExportParticipants(c *fiber.Ctx) error {
 	c.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 	return c.Send(buf.Bytes())
 }
+
 
 func (h *AdminHandler) EventList(c *fiber.Ctx) error {
 	events, err := h.eventService.GetAll()
@@ -784,22 +835,29 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 	status := strings.ToUpper(strings.TrimSpace(c.FormValue("status")))
 
 	formValues := map[string]string{
-		"title":                  title,
-		"slug":                   slug,
-		"description":            description,
-		"event_date":             eventDateStr,
-		"event_time":             eventTime,
-		"location":               location,
-		"price":                  priceStr,
-		"payment_bank":           paymentBank,
-		"payment_account_number": paymentAccountNumber,
-		"payment_account_name":   paymentAccountName,
-		"admin_name":             adminName,
-		"admin_whatsapp":         adminWhatsapp,
-		"max_participants":       maxParticipantsStr,
-		"registration_open":      regOpenStr,
-		"registration_close":     regCloseStr,
-		"status":                 status,
+		"title":                    title,
+		"slug":                     slug,
+		"description":              description,
+		"event_date":               eventDateStr,
+		"event_time":               eventTime,
+		"location":                 location,
+		"price":                    priceStr,
+		"payment_bank":             paymentBank,
+		"payment_account_number":   paymentAccountNumber,
+		"payment_account_name":     paymentAccountName,
+		"admin_name":               adminName,
+		"admin_whatsapp":           adminWhatsapp,
+		"max_participants":         maxParticipantsStr,
+		"registration_open":        regOpenStr,
+		"registration_close":       regCloseStr,
+		"status":                   status,
+		"enable_telegram":          c.FormValue("enable_telegram"),
+		"enable_job_title":         c.FormValue("enable_job_title"),
+		"enable_industrial_estate": c.FormValue("enable_industrial_estate"),
+		"enable_emergency_contact": c.FormValue("enable_emergency_contact"),
+		"enable_vehicle_info":      c.FormValue("enable_vehicle_info"),
+		"enable_carpool":           c.FormValue("enable_carpool"),
+		"enable_tshirt_size":       c.FormValue("enable_tshirt_size"),
 	}
 
 	var errs []string
@@ -905,31 +963,38 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 				AdminUser:  adminUser,
 				AdminRole:  adminRole,
 				ActiveMenu: "events",
-				Stats:     stats,
+				Stats:      stats,
 			},
-			Errors:    errs,
-			Form:      formValues,
+			Errors: errs,
+			Form:   formValues,
 		})
 	}
 
 	newEvent := &models.Event{
-		Title:                title,
-		Slug:                 slug,
-		Description:          description,
-		BannerImage:          bannerFilename,
-		EventDate:            eventDate,
-		EventTime:            eventTime,
-		Location:             location,
-		Price:                price,
-		PaymentBank:          paymentBank,
-		PaymentAccountNumber: paymentAccountNumber,
-		PaymentAccountName:   paymentAccountName,
-		AdminName:            adminName,
-		AdminWhatsapp:        adminWhatsapp,
-		MaxParticipants:      maxParticipants,
-		RegistrationOpen:     regOpen,
-		RegistrationClose:    regClose,
-		Status:               status,
+		Title:                  title,
+		Slug:                   slug,
+		Description:            description,
+		BannerImage:            bannerFilename,
+		EventDate:              eventDate,
+		EventTime:              eventTime,
+		Location:               location,
+		Price:                  price,
+		PaymentBank:            paymentBank,
+		PaymentAccountNumber:   paymentAccountNumber,
+		PaymentAccountName:     paymentAccountName,
+		AdminName:              adminName,
+		AdminWhatsapp:          adminWhatsapp,
+		MaxParticipants:        maxParticipants,
+		RegistrationOpen:       regOpen,
+		RegistrationClose:      regClose,
+		Status:                 status,
+		EnableTelegram:         c.FormValue("enable_telegram") == "true",
+		EnableJobTitle:         c.FormValue("enable_job_title") == "true",
+		EnableIndustrialEstate: c.FormValue("enable_industrial_estate") == "true",
+		EnableEmergencyContact: c.FormValue("enable_emergency_contact") == "true",
+		EnableVehicleInfo:      c.FormValue("enable_vehicle_info") == "true",
+		EnableCarpool:          c.FormValue("enable_carpool") == "true",
+		EnableTShirtSize:       c.FormValue("enable_tshirt_size") == "true",
 	}
 
 	if err := h.eventService.Create(newEvent); err != nil {
@@ -971,20 +1036,27 @@ func (h *AdminHandler) EventEditPage(c *fiber.Ctx) error {
 	adminRole, _ := c.Locals("admin_role").(string)
 
 	formValues := map[string]string{
-		"title":                  event.Title,
-		"slug":                   event.Slug,
-		"description":            event.Description,
-		"event_date":             event.EventDate.Format("2006-01-02"),
-		"event_time":             event.EventTime,
-		"location":               event.Location,
-		"price":                  fmt.Sprintf("%.0f", event.Price),
-		"payment_bank":           event.PaymentBank,
-		"payment_account_number": event.PaymentAccountNumber,
-		"payment_account_name":   event.PaymentAccountName,
-		"admin_name":             event.AdminName,
-		"admin_whatsapp":         event.AdminWhatsapp,
-		"max_participants":       strconv.Itoa(event.MaxParticipants),
-		"status":                 event.Status,
+		"title":                    event.Title,
+		"slug":                     event.Slug,
+		"description":              event.Description,
+		"event_date":               event.EventDate.Format("2006-01-02"),
+		"event_time":               event.EventTime,
+		"location":                 event.Location,
+		"price":                    fmt.Sprintf("%.0f", event.Price),
+		"payment_bank":             event.PaymentBank,
+		"payment_account_number":   event.PaymentAccountNumber,
+		"payment_account_name":     event.PaymentAccountName,
+		"admin_name":               event.AdminName,
+		"admin_whatsapp":           event.AdminWhatsapp,
+		"max_participants":         strconv.Itoa(event.MaxParticipants),
+		"status":                   event.Status,
+		"enable_telegram":          strconv.FormatBool(event.EnableTelegram),
+		"enable_job_title":         strconv.FormatBool(event.EnableJobTitle),
+		"enable_industrial_estate": strconv.FormatBool(event.EnableIndustrialEstate),
+		"enable_emergency_contact": strconv.FormatBool(event.EnableEmergencyContact),
+		"enable_vehicle_info":      strconv.FormatBool(event.EnableVehicleInfo),
+		"enable_carpool":           strconv.FormatBool(event.EnableCarpool),
+		"enable_tshirt_size":       strconv.FormatBool(event.EnableTShirtSize),
 	}
 	if !event.RegistrationOpen.IsZero() {
 		formValues["registration_open"] = event.RegistrationOpen.Format("2006-01-02T15:04")
@@ -1045,22 +1117,29 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 	status := strings.ToUpper(strings.TrimSpace(c.FormValue("status")))
 
 	formValues := map[string]string{
-		"title":                  title,
-		"slug":                   slug,
-		"description":            description,
-		"event_date":             eventDateStr,
-		"event_time":             eventTime,
-		"location":               location,
-		"price":                  priceStr,
-		"payment_bank":           paymentBank,
-		"payment_account_number": paymentAccountNumber,
-		"payment_account_name":   paymentAccountName,
-		"admin_name":             adminName,
-		"admin_whatsapp":         adminWhatsapp,
-		"max_participants":       maxParticipantsStr,
-		"registration_open":      regOpenStr,
-		"registration_close":     regCloseStr,
-		"status":                 status,
+		"title":                    title,
+		"slug":                     slug,
+		"description":              description,
+		"event_date":               eventDateStr,
+		"event_time":               eventTime,
+		"location":                 location,
+		"price":                    priceStr,
+		"payment_bank":             paymentBank,
+		"payment_account_number":   paymentAccountNumber,
+		"payment_account_name":     paymentAccountName,
+		"admin_name":               adminName,
+		"admin_whatsapp":           adminWhatsapp,
+		"max_participants":         maxParticipantsStr,
+		"registration_open":        regOpenStr,
+		"registration_close":       regCloseStr,
+		"status":                   status,
+		"enable_telegram":          c.FormValue("enable_telegram"),
+		"enable_job_title":         c.FormValue("enable_job_title"),
+		"enable_industrial_estate": c.FormValue("enable_industrial_estate"),
+		"enable_emergency_contact": c.FormValue("enable_emergency_contact"),
+		"enable_vehicle_info":      c.FormValue("enable_vehicle_info"),
+		"enable_carpool":           c.FormValue("enable_carpool"),
+		"enable_tshirt_size":       c.FormValue("enable_tshirt_size"),
 	}
 
 	var errs []string
@@ -1190,6 +1269,13 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 	event.RegistrationOpen = regOpen
 	event.RegistrationClose = regClose
 	event.Status = status
+	event.EnableTelegram = c.FormValue("enable_telegram") == "true"
+	event.EnableJobTitle = c.FormValue("enable_job_title") == "true"
+	event.EnableIndustrialEstate = c.FormValue("enable_industrial_estate") == "true"
+	event.EnableEmergencyContact = c.FormValue("enable_emergency_contact") == "true"
+	event.EnableVehicleInfo = c.FormValue("enable_vehicle_info") == "true"
+	event.EnableCarpool = c.FormValue("enable_carpool") == "true"
+	event.EnableTShirtSize = c.FormValue("enable_tshirt_size") == "true"
 
 	if err := h.eventService.Update(event); err != nil {
 		errs = append(errs, "Gagal memperbarui Acara: "+err.Error())

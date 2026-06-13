@@ -143,19 +143,29 @@ func (h *PageHandler) RegisterSubmit(c *fiber.Ctx) error {
 
 	// Parse form fields
 	form := &services.RegisterForm{
-		FullName:         c.FormValue("full_name"),
-		Phone:            c.FormValue("phone"),
-		Email:            c.FormValue("email"),
-		City:             c.FormValue("city"),
-		CompanyName:      c.FormValue("company_name"),
-		IndustrialEstate: c.FormValue("industrial_estate"),
-		TelegramUsername: c.FormValue("telegram_username"),
-		JobTitle:         c.FormValue("job_title"),
+		FullName:              c.FormValue("full_name"),
+		Phone:                 c.FormValue("phone"),
+		Email:                 c.FormValue("email"),
+		City:                  c.FormValue("city"),
+		CompanyName:           c.FormValue("company_name"),
+		IndustrialEstate:      c.FormValue("industrial_estate"),
+		IndustrialEstateName:  c.FormValue("industrial_estate_name"),
+		TelegramUsername:      c.FormValue("telegram_username"),
+		JobTitle:              c.FormValue("job_title"),
+		EmergencyName:         c.FormValue("emergency_name"),
+		EmergencyRelationship: c.FormValue("emergency_relationship"),
+		EmergencyPhone:        c.FormValue("emergency_phone"),
+		OwnVehicle:            c.FormValue("own_vehicle"),
+		VehicleType:           c.FormValue("vehicle_type"),
+		LicensePlate:          c.FormValue("license_plate"),
+		CarpoolCanBring:      c.FormValue("carpool_can_bring"),
+		CarpoolSeats:          c.FormValue("carpool_seats"),
+		TShirtSize:            c.FormValue("tshirt_size"),
 	}
 
 	// Collect validation errors
 	var allErrors []string
-	allErrors = append(allErrors, form.Validate()...)
+	allErrors = append(allErrors, form.Validate(event)...)
 
 	// Handle payment proof upload
 	file, fileErr := c.FormFile("payment_proof")
@@ -370,14 +380,24 @@ func buildErrorFragment(errs []string) string {
 
 func formToMap(form *services.RegisterForm) map[string]string {
 	return map[string]string{
-		"full_name":         form.FullName,
-		"phone":             form.Phone,
-		"email":             form.Email,
-		"city":              form.City,
-		"company_name":      form.CompanyName,
-		"industrial_estate": form.IndustrialEstate,
-		"telegram_username": form.TelegramUsername,
-		"job_title":         form.JobTitle,
+		"full_name":              form.FullName,
+		"phone":                  form.Phone,
+		"email":                  form.Email,
+		"city":                   form.City,
+		"company_name":           form.CompanyName,
+		"industrial_estate":      form.IndustrialEstate,
+		"industrial_estate_name": form.IndustrialEstateName,
+		"telegram_username":      form.TelegramUsername,
+		"job_title":              form.JobTitle,
+		"emergency_name":         form.EmergencyName,
+		"emergency_relationship": form.EmergencyRelationship,
+		"emergency_phone":        form.EmergencyPhone,
+		"own_vehicle":            form.OwnVehicle,
+		"vehicle_type":           form.VehicleType,
+		"license_plate":          form.LicensePlate,
+		"carpool_can_bring":      form.CarpoolCanBring,
+		"carpool_seats":          form.CarpoolSeats,
+		"tshirt_size":            form.TShirtSize,
 	}
 }
 
@@ -414,6 +434,7 @@ var idDays = map[time.Weekday]string{
 
 func buildFuncMap() template.FuncMap {
 	return template.FuncMap{
+		"isEq": func(a, b string) bool { return a == b },
 		// formatDateLong → "Jumat, 15 Agustus 2025"
 		"formatDateLong": func(t time.Time) string {
 			return fmt.Sprintf("%s, %d %s %d", idDays[t.Weekday()], t.Day(), idMonths[t.Month()], t.Year())
