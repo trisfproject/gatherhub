@@ -283,6 +283,131 @@ docker compose up -d
 
 ---
 
+## 🌐 Production Deployment Guide
+
+GatherHub is designed for robust, production-ready deployments. Here is how to configure Docker, Docker Compose, Nginx (as a Reverse Proxy), and NFS Shared Storage.
+
+### 1. Standalone Docker Container
+
+You can build and run the backend as a standalone container:
+
+```bash
+# Build the production image with version injection
+docker build \
+  --build-arg APP_VERSION=1.0.0 \
+  --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+  --build-arg GIT_COMMIT=$(git rev-parse HEAD) \
+  -t gatherhub-backend:latest ./backend
+
+# Run the container (injecting required variables)
+docker run -d -p 3000:3000 \
+  -e DB_HOST=192.168.1.10 \
+  -e DB_PORT=5432 \
+  -e DB_USER=gatherhub \
+  -e DB_PASSWORD=secure_password \
+  -e DB_NAME=gatherhub \
+  -e STORAGE_PATH=/storage \
+  -e SESSION_SECRET=super_secret_key_change_me \
+  -e ADMIN_USERNAME=admin \
+  -e ADMIN_PASSWORD=secure_admin_password \
+  -v /mnt/shared-nfs-storage:/storage \
+  gatherhub-backend:latest
+```
+
+### 2. Multi-Container Deployment via Docker Compose
+
+In production, run the stack using Docker Compose:
+
+```bash
+# Start all containers in detached mode
+docker compose up -d
+```
+
+Key features of this configuration:
+* **Fail-Fast Startup**: The backend will wait until the Postgres DB container is fully healthy (`pg_isready` returns `0` inside its healthcheck) before initiating startup validation.
+* **Eager Validation**: On startup, the backend verifies configuration, tests DB ping, and confirms that `/storage` is readable/writable. It fails fast if any validation fails.
+
+### 3. Nginx Reverse Proxy & SSL Configuration
+
+Deploy Nginx in front of GatherHub for SSL/TLS termination, request forwarding, and high-performance static asset caching.
+
+#### Sample Nginx Virtual Host Config (`/etc/nginx/conf.d/gatherhub.conf`)
+
+```nginx
+server {
+    listen 80;
+    server_name event.domain.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name event.domain.com;
+
+    ssl_certificate /etc/letsencrypt/live/event.domain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/event.domain.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    # Static uploads: Serve payment proofs and event banners directly from NFS/Disk
+    location /payments/ {
+        alias /var/www/gatherhub/storage/payments/;
+        expires 30d;
+        access_log off;
+    }
+
+    location /events/ {
+        alias /var/www/gatherhub/storage/events/;
+        expires 30d;
+        access_log off;
+    }
+
+    # API and Admin routes: Reverse proxy to Go backend
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Enable buffering for file uploads
+        client_max_body_size 12M;
+        proxy_buffering on;
+    }
+}
+```
+
+### 4. NFS Shared Storage (Horizontal Scaling)
+
+When scaling the backend horizontally across multiple nodes (e.g., in a high-availability Kubernetes cluster or multi-server Docker Swarm), you **must** use a shared filesystem for `STORAGE_PATH` so all replicas can read/write payment proofs and banners.
+
+#### Configuring NFS in `/etc/fstab` (Linux Host)
+
+Mount the NFS share on your server hosts:
+```text
+192.168.1.100:/shares/gatherhub-storage /mnt/gatherhub-storage nfs rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport 0 0
+```
+
+#### Mounting NFS via Docker Volume (Docker Compose)
+
+Configure the NFS mount directly in your Compose file:
+```yaml
+volumes:
+  nfs_storage:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.1.100,rw,nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport
+      device: ":/shares/gatherhub-storage"
+
+services:
+  backend:
+    volumes:
+      - nfs_storage:/storage
+```
+
+---
+
 ## 🛠️ Tech Stack
 
 | Layer       | Technology                          |

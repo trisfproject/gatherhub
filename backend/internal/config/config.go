@@ -69,3 +69,26 @@ func getEnv(key, fallback string) string {
 	}
 	return fallback
 }
+
+// Validate checks if required environment variables are set and non-empty.
+func (c *Config) Validate() []string {
+	var missing []string
+	requiredVars := []string{
+		"DB_HOST",
+		"DB_PORT",
+		"DB_USER",
+		"DB_PASSWORD",
+		"DB_NAME",
+		"STORAGE_PATH",
+		"ADMIN_USERNAME",
+		"ADMIN_PASSWORD",
+		"SESSION_SECRET",
+	}
+
+	for _, name := range requiredVars {
+		if val, exists := os.LookupEnv(name); !exists || val == "" {
+			missing = append(missing, name)
+		}
+	}
+	return missing
+}

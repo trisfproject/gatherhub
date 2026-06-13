@@ -13,9 +13,13 @@ RUN go mod download
 # Copy source code
 COPY . .
 
+ARG APP_VERSION=1.0.0
+ARG BUILD_DATE=unknown
+ARG GIT_COMMIT=unknown
+
 # Build binary
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -ldflags="-w -s" -o gatherhub ./cmd/server/main.go
+    go build -ldflags="-w -s -X github.com/trisfproject/gatherhub/internal/services.AppVersion=${APP_VERSION} -X github.com/trisfproject/gatherhub/internal/services.BuildTime=${BUILD_DATE} -X github.com/trisfproject/gatherhub/internal/services.GitCommit=${GIT_COMMIT}" -o gatherhub ./cmd/server/main.go
 
 # ---
 

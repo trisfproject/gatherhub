@@ -45,6 +45,7 @@ type SystemInfo struct {
 	AppVersion string `json:"app_version"`
 	GoVersion  string `json:"go_version"`
 	BuildTime  string `json:"build_time"`
+	GitCommit  string `json:"git_commit"`
 	Env        string `json:"env"`
 	OS         string `json:"os"`
 	Arch       string `json:"arch"`
@@ -68,6 +69,7 @@ type HealthReport struct {
 var (
 	AppVersion = "1.0.0"
 	BuildTime  = "unknown"
+	GitCommit  = "unknown"
 )
 
 // ─────────────────────── Service ───────────────────────
@@ -216,10 +218,15 @@ func (s *HealthService) GetSystemInfo() SystemInfo {
 	if bt == "" || bt == "unknown" {
 		bt = "not set (dev build)"
 	}
+	gc := GitCommit
+	if gc == "" || gc == "unknown" {
+		gc = "not set (dev build)"
+	}
 	return SystemInfo{
 		AppVersion: AppVersion,
 		GoVersion:  runtime.Version(),
 		BuildTime:  bt,
+		GitCommit:  gc,
 		Env:        env,
 		OS:         runtime.GOOS,
 		Arch:       runtime.GOARCH,

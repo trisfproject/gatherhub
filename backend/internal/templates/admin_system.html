@@ -298,6 +298,11 @@
           <p class="text-xs text-white/40 font-semibold uppercase tracking-wider mb-1">Versi Aplikasi</p>
           <p class="text-sm font-bold text-indigo-300 font-mono">v{{.Health.System.AppVersion}}</p>
         </div>
+        <!-- Git Commit -->
+        <div class="bg-white/4 rounded-xl p-4">
+          <p class="text-xs text-white/40 font-semibold uppercase tracking-wider mb-1">Git Commit</p>
+          <p class="text-sm font-bold text-white font-mono truncate" title="{{.Health.System.GitCommit}}">{{.Health.System.GitCommit}}</p>
+        </div>
         <!-- Go Version -->
         <div class="bg-white/4 rounded-xl p-4">
           <p class="text-xs text-white/40 font-semibold uppercase tracking-wider mb-1">Go Version</p>

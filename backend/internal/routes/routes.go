@@ -48,7 +48,7 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 		if strings.HasPrefix(path, "/admin") ||
 			strings.HasPrefix(path, "/payments") ||
 			strings.HasPrefix(path, "/events") ||
-			path == "/health" {
+			strings.HasPrefix(path, "/health") {
 			return c.Next()
 		}
 
@@ -69,6 +69,8 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 
 	// ── Infrastructure ────────────────────────────────────────
 	app.Get("/health", healthHandler.Health)
+	app.Get("/health/live", healthHandler.Live)
+	app.Get("/health/ready", healthHandler.Ready)
 
 	// ── JSON API (v1) ─────────────────────────────────────────
 	api := app.Group("/api/v1")

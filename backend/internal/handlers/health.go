@@ -46,3 +46,24 @@ func (h *HealthHandler) Health(c *fiber.Ctx) error {
 		"system":   report.System,
 	})
 }
+
+// Live handles GET /health/live — returns 200 OK if the app is running
+func (h *HealthHandler) Live(c *fiber.Ctx) error {
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status": "live",
+	})
+}
+
+// Ready handles GET /health/ready — verifies DB and storage readiness
+func (h *HealthHandler) Ready(c *fiber.Ctx) error {
+	report := h.healthService.Report()
+	status := fiber.StatusOK
+	if report.Overall == services.StatusCritical {
+		status = fiber.StatusServiceUnavailable
+	}
+	return c.Status(status).JSON(fiber.Map{
+		"status":  report.Overall,
+		"db":      report.DB.Status,
+		"storage": report.Storage.Status,
+	})
+}
