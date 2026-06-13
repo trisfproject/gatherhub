@@ -22,6 +22,7 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	participantService := services.NewParticipantService(db, storageService)
 	notificationService := services.NewNotificationService(db, auditLogService, settingsService)
 	broadcastService := services.NewBroadcastService(db, notificationService, auditLogService)
+	healthService := services.NewHealthService(db, settingsService.Get("storage_path"))
 
 	adminService := services.NewAdminService(db)
 	if err := adminService.SeedDefaultAdmin(); err != nil {
@@ -29,14 +30,14 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	}
 
 	// ── Handlers ──────────────────────────────────────────────
-	healthHandler := handlers.NewHealthHandler(db)
+	healthHandler := handlers.NewHealthHandler(db, healthService)
 
 	pageHandler, err := handlers.NewPageHandler(eventService, participantService, notificationService, checkinService, settingsService)
 	if err != nil {
 		log.Fatalf("Failed to initialise page handler: %v", err)
 	}
 
-	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storageService, notificationService, auditLogService, checkinService, settingsService, backupService, broadcastService)
+	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storageService, notificationService, auditLogService, checkinService, settingsService, backupService, broadcastService, healthService)
 	if err != nil {
 		log.Fatalf("Failed to initialise admin handler: %v", err)
 	}
@@ -127,6 +128,9 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	admin.Post("/broadcasts/preview", adminHandler.BroadcastPreview)
 	admin.Get("/broadcasts/count-recipients", adminHandler.BroadcastCountRecipients)
 	admin.Get("/broadcasts/:id", adminHandler.BroadcastDetail)
+
+	// System health
+	admin.Get("/system", adminHandler.SystemHealth)
 
 	// Admin management & settings (SUPER_ADMIN only)
 	superAdmin := admin.Group("/", middleware.RequireRole(store, "SUPER_ADMIN"))

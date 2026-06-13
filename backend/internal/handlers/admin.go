@@ -189,6 +189,13 @@ type AdminCheckinData struct {
 	FlashError   string
 }
 
+type AdminSystemHealthData struct {
+	AdminUser string
+	AdminRole string
+	Health    *services.HealthReport
+	Stats     *services.ParticipantStats
+}
+
 // ─────────────────────── Handler ───────────────────────
 
 // AdminHandler handles all admin panel routes
@@ -204,6 +211,7 @@ type AdminHandler struct {
 	settingsService     *services.SettingsService
 	backupService       *services.BackupService
 	broadcastService    *services.BroadcastService
+	healthService       *services.HealthService
 	tmpl                *template.Template
 }
 
@@ -220,6 +228,7 @@ func NewAdminHandler(
 	settingsService *services.SettingsService,
 	backupService *services.BackupService,
 	broadcastService *services.BroadcastService,
+	healthService *services.HealthService,
 ) (*AdminHandler, error) {
 	funcMap := buildAdminFuncMap()
 	funcMap["setting"] = func(key string) string {
@@ -252,6 +261,7 @@ func NewAdminHandler(
 		"admin_broadcasts.html",
 		"admin_broadcast_create.html",
 		"admin_broadcast_detail.html",
+		"admin_system.html",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse admin templates: %w", err)
@@ -268,6 +278,7 @@ func NewAdminHandler(
 		settingsService:     settingsService,
 		backupService:       backupService,
 		broadcastService:    broadcastService,
+		healthService:       healthService,
 		tmpl:                t,
 	}, nil
 }
@@ -2574,4 +2585,28 @@ func (h *AdminHandler) BroadcastDetail(c *fiber.Ctx) error {
 	return h.render(c, "admin_broadcast_detail.html", data)
 }
 
+// ─────────────────────── System Health ───────────────────────
 
+// SystemHealth handles GET /admin/system
+func (h *AdminHandler) SystemHealth(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	// Refresh storage path from live settings before running the check
+	storagePath := h.settingsService.Get("storage_path")
+	h.healthService.UpdateStoragePath(storagePath)
+
+	report := h.healthService.Report()
+
+	stats, err := h.participantService.GetStats()
+	if err != nil {
+		stats = &services.ParticipantStats{}
+	}
+
+	return h.render(c, "admin_system.html", AdminSystemHealthData{
+		AdminUser: adminUser,
+		AdminRole: adminRole,
+		Health:    &report,
+		Stats:     stats,
+	})
+}

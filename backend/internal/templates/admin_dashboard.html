@@ -126,6 +126,12 @@
       </svg>
       Pusat Broadcast
     </a>
+    <a href="/admin/system" class="nav-item">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+      </svg>
+      Kesehatan Sistem
+    </a>
     {{if eq .AdminRole "SUPER_ADMIN"}}
     <a href="/admin/admins" class="nav-item">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -544,6 +550,38 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
           Terverifikasi ({{.Stats.Verified}})
+        </a>
+      </div>
+    </div>
+
+    <!-- ── System Health Mini Card ── -->
+    <div class="glass p-5 fade-up">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+            <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+            </svg>
+          </div>
+          <h3 class="font-bold text-white text-sm">Kesehatan Sistem</h3>
+        </div>
+        <a href="/admin/system" class="text-xs text-indigo-400 hover:text-indigo-300 font-bold transition-colors">Detail →</a>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div class="bg-white/4 rounded-xl p-3 text-center">
+          <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 mx-auto mb-2 animate-pulse"></div>
+          <p class="text-xs text-white/40 font-semibold uppercase tracking-wider mb-0.5">Aplikasi</p>
+          <p class="text-xs font-bold text-emerald-300">Aktif</p>
+        </div>
+        <a href="/admin/system" class="bg-white/4 hover:bg-white/8 rounded-xl p-3 text-center transition-colors block">
+          <div class="w-2.5 h-2.5 rounded-full bg-indigo-400 mx-auto mb-2"></div>
+          <p class="text-xs text-white/40 font-semibold uppercase tracking-wider mb-0.5">Database</p>
+          <p class="text-xs font-bold text-white/70">Cek →</p>
+        </a>
+        <a href="/admin/system" class="bg-white/4 hover:bg-white/8 rounded-xl p-3 text-center transition-colors block">
+          <div class="w-2.5 h-2.5 rounded-full bg-indigo-400 mx-auto mb-2"></div>
+          <p class="text-xs text-white/40 font-semibold uppercase tracking-wider mb-0.5">Storage</p>
+          <p class="text-xs font-bold text-white/70">Cek →</p>
         </a>
       </div>
     </div>
