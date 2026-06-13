@@ -16,7 +16,7 @@ def run_tests():
     # 1. Login as admin
     print("[1] Logging in as admin...")
     login_data = {
-        "username": "trisf",
+        "username": "admin",
         "password": "admin123"
     }
     r = session.post(f"{BASE_URL}/admin/login", data=login_data, allow_redirects=False)

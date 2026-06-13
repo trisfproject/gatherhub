@@ -54,6 +54,11 @@ func main() {
 		log.Fatalf("FATAL: Database connection validation failed: %v", err)
 	}
 
+	// Ensure PostgreSQL enum has all required values before migrations/updates
+	db.Exec("ALTER TYPE participant_status ADD VALUE IF NOT EXISTS 'REGISTERED'")
+	db.Exec("ALTER TYPE participant_status ADD VALUE IF NOT EXISTS 'WAITLIST'")
+	db.Exec("ALTER TYPE participant_status ADD VALUE IF NOT EXISTS 'CHECKED_IN'")
+
 	// ── Run auto migrations ───────────────────────────────────
 	if err := database.AutoMigrate(db); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
@@ -140,7 +145,7 @@ func main() {
 	backupService := services.NewBackupService(cfg)
 
 	// ── Register all routes ───────────────────────────────────
-	routes.Register(app, db, storageService, cfg.AdminUsername, cfg.AdminPassword, store, cfg.SessionSecret, settingsService, backupService)
+	routes.Register(app, db, storageService, store, cfg.SessionSecret, settingsService, backupService)
 
 	// ── Start server & handle Graceful Shutdown ───────────────
 	sigChan := make(chan os.Signal, 1)

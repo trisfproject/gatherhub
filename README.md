@@ -258,8 +258,9 @@ docker compose up -d
 | `DB_SSLMODE`     | `disable`              | PostgreSQL SSL mode                        |
 | `STORAGE_PATH`   | `/storage`             | **Root path for all runtime uploads**      |
 | `FRONTEND_DIR`   | `../frontend`          | Frontend static files directory            |
-| `ADMIN_USERNAME` | `admin`                | Default admin username (seed only)         |
-| `ADMIN_PASSWORD` | `admin123`             | Default admin password (seed only)         |
+| `INITIAL_ADMIN_USERNAME` | `admin`                | Default admin username (seed only)         |
+| `INITIAL_ADMIN_PASSWORD` | `admin123`             | Default admin password (seed only)         |
+| `INITIAL_ADMIN_EMAIL`    | `admin@gatherhub.local`| Default admin email (seed only)            |
 | `SESSION_SECRET` | *(see example)*        | Session encryption key                     |
 
 ---
@@ -308,8 +309,9 @@ docker run -d -p 3000:3000 \
   -e DB_NAME=gatherhub \
   -e STORAGE_PATH=/storage \
   -e SESSION_SECRET=super_secret_key_change_me \
-  -e ADMIN_USERNAME=admin \
-  -e ADMIN_PASSWORD=secure_admin_password \
+  -e INITIAL_ADMIN_USERNAME=admin \
+  -e INITIAL_ADMIN_PASSWORD=secure_admin_password \
+  -e INITIAL_ADMIN_EMAIL=admin@domain.com \
   -v /mnt/shared-nfs-storage:/storage \
   gatherhub-backend:latest
 ```

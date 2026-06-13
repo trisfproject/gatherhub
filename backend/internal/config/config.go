@@ -29,9 +29,10 @@ type Config struct {
 	// Frontend (served by Fiber for local dev)
 	FrontendDir string
 
-	// Admin credentials (set via env, never hardcoded in production)
-	AdminUsername string
-	AdminPassword string
+	// Initial Admin credentials (set via env, never hardcoded in production)
+	InitialAdminUsername string
+	InitialAdminPassword string
+	InitialAdminEmail    string
 	SessionSecret string
 }
 
@@ -57,8 +58,9 @@ func Load() *Config {
 
 		FrontendDir: getEnv("FRONTEND_DIR", "../frontend"),
 
-		AdminUsername: getEnv("ADMIN_USERNAME", "admin"),
-		AdminPassword: getEnv("ADMIN_PASSWORD", "admin123"),
+		InitialAdminUsername: getEnv("INITIAL_ADMIN_USERNAME", ""),
+		InitialAdminPassword: getEnv("INITIAL_ADMIN_PASSWORD", ""),
+		InitialAdminEmail:    getEnv("INITIAL_ADMIN_EMAIL", ""),
 		SessionSecret: getEnv("SESSION_SECRET", "gatherhub-secret-change-in-production"),
 	}
 }
@@ -80,8 +82,6 @@ func (c *Config) Validate() []string {
 		"DB_PASSWORD",
 		"DB_NAME",
 		"STORAGE_PATH",
-		"ADMIN_USERNAME",
-		"ADMIN_PASSWORD",
 		"SESSION_SECRET",
 	}
 

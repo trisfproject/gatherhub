@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/trisfproject/gatherhub/internal/models"
 	"golang.org/x/crypto/bcrypt"
@@ -22,42 +23,41 @@ func NewAdminService(db *gorm.DB) *AdminService {
 
 // SeedDefaultAdmin creates the default admin user if it does not already exist
 func (s *AdminService) SeedDefaultAdmin() error {
-	var admin models.Admin
-	err := s.db.Where("username = ?", "trisf").First(&admin).Error
-	if err == nil {
-		if admin.Role != "SUPER_ADMIN" {
-			admin.Role = "SUPER_ADMIN"
-			s.db.Save(&admin)
-			log.Println("Default admin role updated to SUPER_ADMIN")
+	var count int64
+	if err := s.db.Model(&models.Admin{}).Count(&count).Error; err != nil {
+		return fmt.Errorf("failed to count admin accounts: %w", err)
+	}
+
+	if count == 0 {
+		log.Println("No administrator accounts found.")
+		username := os.Getenv("INITIAL_ADMIN_USERNAME")
+		password := os.Getenv("INITIAL_ADMIN_PASSWORD")
+		email := os.Getenv("INITIAL_ADMIN_EMAIL")
+
+		if username == "" || password == "" || email == "" {
+			return nil
 		}
-		log.Println("Default admin already exists")
-		return nil
+
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return fmt.Errorf("failed to hash default admin password: %w", err)
+		}
+
+		defaultAdmin := models.Admin{
+			Name:         username,
+			Username:     username,
+			Email:        email,
+			PasswordHash: string(hash),
+			Role:         "SUPER_ADMIN",
+		}
+
+		if err := s.db.Create(&defaultAdmin).Error; err != nil {
+			return fmt.Errorf("failed to create default admin: %w", err)
+		}
+
+		log.Println("Default admin created")
 	}
 
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return fmt.Errorf("failed to query admin table: %w", err)
-	}
-
-	// Password hash using bcrypt
-	passwordBytes := []byte("samudera")
-	hash, err := bcrypt.GenerateFromPassword(passwordBytes, bcrypt.DefaultCost)
-	if err != nil {
-		return fmt.Errorf("failed to hash default admin password: %w", err)
-	}
-
-	defaultAdmin := models.Admin{
-		Name:         "trisf",
-		Username:     "trisf",
-		Email:        "admin@gatherhub.local",
-		PasswordHash: string(hash),
-		Role:         "SUPER_ADMIN",
-	}
-
-	if err := s.db.Create(&defaultAdmin).Error; err != nil {
-		return fmt.Errorf("failed to create default admin: %w", err)
-	}
-
-	log.Println("Default admin created")
 	return nil
 }
 

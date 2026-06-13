@@ -14,7 +14,7 @@ import (
 
 // Register sets up all application routes.
 // storage holds the resolved paths for all upload directories.
-func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageService, adminUsername, adminPassword string, store *session.Store, sessionSecret string, settingsService *services.SettingsService, backupService *services.BackupService) {
+func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageService, store *session.Store, sessionSecret string, settingsService *services.SettingsService, backupService *services.BackupService) {
 	// ── Services ──────────────────────────────────────────────
 	auditLogService := services.NewAuditLogService(db)
 	checkinService := services.NewCheckinService(db, sessionSecret)
