@@ -89,8 +89,51 @@ func (s *EventService) Update(event *models.Event) error {
 	})
 }
 
-// Delete removes an event and all its associated participants
+// DependencyError is returned when an event has related records and cannot be deleted
+type DependencyError struct {
+	Counts map[string]int64
+}
+
+func (e *DependencyError) Error() string {
+	return "This event cannot be deleted because it still contains related data."
+}
+
+// Delete removes an event only if no related records exist
 func (s *EventService) Delete(id uint) error {
+	var participants, tasks, sponsors, broadcasts, transAssignments, checkins int64
+
+	if err := s.db.Model(&models.Participant{}).Where("event_id = ?", id).Count(&participants).Error; err != nil {
+		return err
+	}
+	if err := s.db.Model(&models.Task{}).Where("event_id = ?", id).Count(&tasks).Error; err != nil {
+		return err
+	}
+	if err := s.db.Model(&models.Sponsor{}).Where("event_id = ?", id).Count(&sponsors).Error; err != nil {
+		return err
+	}
+	if err := s.db.Model(&models.Broadcast{}).Where("event_id = ?", id).Count(&broadcasts).Error; err != nil {
+		return err
+	}
+	if err := s.db.Model(&models.Participant{}).Where("event_id = ? AND driver_id IS NOT NULL", id).Count(&transAssignments).Error; err != nil {
+		return err
+	}
+	if err := s.db.Model(&models.Attendance{}).Where("event_id = ?", id).Count(&checkins).Error; err != nil {
+		return err
+	}
+
+	if participants > 0 || tasks > 0 || sponsors > 0 || broadcasts > 0 || transAssignments > 0 || checkins > 0 {
+		return &DependencyError{
+			Counts: map[string]int64{
+				"Participants":               participants,
+				"Tasks":                      tasks,
+				"Sponsors":                   sponsors,
+				"Broadcasts":                 broadcasts,
+				"Transportation Assignments": transAssignments,
+				"Check-ins":                  checkins,
+			},
+		}
+	}
+
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		// Delete participants first to satisfy foreign key constraints
 		if err := tx.Where("event_id = ?", id).Delete(&models.Participant{}).Error; err != nil {

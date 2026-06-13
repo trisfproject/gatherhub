@@ -195,6 +195,7 @@
               <option value="DRAFT" class="bg-indigo-950" {{if isEq (index .Form "status") "DRAFT"}}selected{{end}}>DRAFT (Hanya admin)</option>
               <option value="PUBLISHED" class="bg-indigo-950" {{if isEq (index .Form "status") "PUBLISHED"}}selected{{end}}>PUBLISHED (Pendaftaran dibuka)</option>
               <option value="CLOSED" class="bg-indigo-950" {{if isEq (index .Form "status") "CLOSED"}}selected{{end}}>CLOSED (Pendaftaran ditutup)</option>
+              <option value="ARCHIVED" class="bg-indigo-950" {{if isEq (index .Form "status") "ARCHIVED"}}selected{{end}}>ARCHIVED (Diarsipkan)</option>
             </select>
           </div>
 

@@ -1117,7 +1117,7 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 		}
 	}
 
-	allowedStatus := map[string]bool{"DRAFT": true, "PUBLISHED": true, "CLOSED": true}
+	allowedStatus := map[string]bool{"DRAFT": true, "PUBLISHED": true, "CLOSED": true, "ARCHIVED": true}
 	if status == "" {
 		status = "DRAFT"
 	} else if !allowedStatus[status] {
@@ -1406,7 +1406,7 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 		}
 	}
 
-	allowedStatus := map[string]bool{"DRAFT": true, "PUBLISHED": true, "CLOSED": true}
+	allowedStatus := map[string]bool{"DRAFT": true, "PUBLISHED": true, "CLOSED": true, "ARCHIVED": true}
 	if status == "" {
 		status = "DRAFT"
 	} else if !allowedStatus[status] {
@@ -1514,7 +1514,28 @@ func (h *AdminHandler) EventDelete(c *fiber.Ctx) error {
 	}
 
 	if err := h.eventService.Delete(uint(id)); err != nil {
-		setFlash(c, "error", "Gagal menghapus acara: "+err.Error())
+		var errMsg string
+		if depErr, ok := err.(*services.DependencyError); ok {
+			var details []string
+			keys := []string{"Tasks", "Participants", "Sponsors", "Broadcasts", "Transportation Assignments", "Check-ins"}
+			for _, k := range keys {
+				if count := depErr.Counts[k]; count > 0 {
+					details = append(details, fmt.Sprintf("%s: %d", k, count))
+				}
+			}
+			errMsg = "This event cannot be deleted because it still contains related data."
+			if len(details) > 0 {
+				errMsg += "<br><ul class=\"list-disc list-inside mt-1.5 space-y-0.5 text-xs text-red-200\">"
+				for _, d := range details {
+					errMsg += "<li>" + d + "</li>"
+				}
+				errMsg += "</ul>"
+			}
+		} else {
+			errMsg = "Gagal menghapus acara: " + err.Error()
+		}
+
+		setFlash(c, "error", errMsg)
 		if c.Get("HX-Request") == "true" {
 			c.Set("HX-Redirect", "/admin/events")
 			return c.SendStatus(fiber.StatusOK)
@@ -1572,7 +1593,7 @@ func (h *AdminHandler) EventUpdateStatus(c *fiber.Ctx) error {
 	}
 
 	status := strings.ToUpper(strings.TrimSpace(c.FormValue("status")))
-	allowedStatus := map[string]bool{"DRAFT": true, "PUBLISHED": true, "CLOSED": true}
+	allowedStatus := map[string]bool{"DRAFT": true, "PUBLISHED": true, "CLOSED": true, "ARCHIVED": true}
 	if !allowedStatus[status] {
 		return c.Redirect(fmt.Sprintf("/admin/events/%d", id), fiber.StatusSeeOther)
 	}
@@ -2271,6 +2292,9 @@ var adminIDMonths = map[time.Month]string{
 
 func buildAdminFuncMap() template.FuncMap {
 	return template.FuncMap{
+		"safeHTML": func(s string) template.HTML {
+			return template.HTML(s)
+		},
 		"formatDateShort": func(t time.Time) string {
 			return fmt.Sprintf("%d %s %d", t.Day(), adminIDMonths[t.Month()], t.Year())
 		},

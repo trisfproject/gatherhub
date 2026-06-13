@@ -25,6 +25,7 @@
     .badge-draft{background:rgba(245,158,11,.12);color:#fbbf24;border-color:rgba(245,158,11,.25)}
     .badge-published{background:rgba(16,185,129,.12);color:#34d399;border-color:rgba(16,185,129,.25)}
     .badge-closed{background:rgba(239,68,68,.12);color:#f87171;border-color:rgba(239,68,68,.25)}
+    .badge-archived{background:rgba(156,163,175,.12);color:#9ca3af;border-color:rgba(156,163,175,.25)}
     .badge-p-pending{background:rgba(245,158,11,.12);color:#fbbf24;border-color:rgba(245,158,11,.25)}
     .badge-p-verified{background:rgba(16,185,129,.12);color:#34d399;border-color:rgba(16,185,129,.25)}
     .badge-p-rejected{background:rgba(239,68,68,.12);color:#f87171;border-color:rgba(239,68,68,.25)}
@@ -85,7 +86,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
       </svg>
       <div>
-        <p class="text-red-300 font-semibold text-sm">{{.FlashError}}</p>
+        <p class="text-red-300 font-semibold text-sm">{{.FlashError | safeHTML}}</p>
       </div>
     </div>
     {{end}}
@@ -109,13 +110,18 @@
               <div class="flex items-center gap-2">
                 {{if isEq .Event.Status "PUBLISHED"}}
                 <span class="badge badge-published">
-                  <svg class="w-3 h-3 pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                  <svg class="w-3.5 h-3.5 pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                   PUBLISHED
                 </span>
                 {{else if isEq .Event.Status "CLOSED"}}
                 <span class="badge badge-closed">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                   CLOSED
+                </span>
+                {{else if isEq .Event.Status "ARCHIVED"}}
+                <span class="badge badge-archived">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                  ARCHIVED
                 </span>
                 {{else}}
                 <span class="badge badge-draft">
@@ -312,6 +318,12 @@
               {{if ne .Event.Status "CLOSED"}}
               <button type="submit" name="status" value="CLOSED" class="flex items-center justify-center gap-2 w-full bg-red-600/15 hover:bg-red-600/30 text-red-300 border border-red-500/20 font-bold py-2 px-4 rounded-xl text-xs transition-all">
                 Tutup Pendaftaran
+              </button>
+              {{end}}
+
+              {{if ne .Event.Status "ARCHIVED"}}
+              <button type="submit" name="status" value="ARCHIVED" class="flex items-center justify-center gap-2 w-full bg-gray-600/15 hover:bg-gray-600/30 text-gray-300 border border-gray-500/20 font-bold py-2 px-4 rounded-xl text-xs transition-all">
+                Arsipkan Acara
               </button>
               {{end}}
 
