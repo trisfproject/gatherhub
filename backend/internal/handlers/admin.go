@@ -25,14 +25,21 @@ import (
 
 // ─────────────────────── Data structs ───────────────────────
 
+// AdminBase is embedded in every admin page data struct so that the
+// shared admin_sidebar.html partial always receives the fields it needs.
+type AdminBase struct {
+	AdminUser  string
+	AdminRole  string
+	ActiveMenu string // e.g. "dashboard", "participants", "broadcasts", …
+	Stats      *services.ParticipantStats
+}
+
 type AdminLoginData struct {
 	Error string
 }
 
 type AdminDashboardData struct {
-	AdminUser           string
-	AdminRole           string
-	Stats               *services.ParticipantStats
+	AdminBase
 	RecentRegistrations []models.Participant
 	RecentVerifications []models.Participant
 	Events              []models.Event
@@ -50,18 +57,14 @@ type ParticipantPage struct {
 }
 
 type AdminNotificationsData struct {
-	AdminUser string
-	AdminRole string
-	Logs      []models.NotificationLog
-	Stats     *services.ParticipantStats
-	Event     *models.Event
+	AdminBase
+	Logs  []models.NotificationLog
+	Event *models.Event
 }
 
 type AdminParticipantsData struct {
-	AdminUser      string
-	AdminRole      string
+	AdminBase
 	Participants   []models.Participant
-	Stats          *services.ParticipantStats
 	Filter         string
 	Search         string
 	Event          *models.Event
@@ -84,76 +87,59 @@ type AdminParticipantsData struct {
 }
 
 type AdminParticipantDetailData struct {
-	AdminUser   string
-	AdminRole   string
+	AdminBase
 	Participant *models.Participant
 	Event       *models.Event
 	PaymentURL  string
-	Stats       *services.ParticipantStats
 }
 
 type AdminEventsData struct {
-	AdminUser    string
-	AdminRole    string
+	AdminBase
 	Events       []models.Event
-	Stats        *services.ParticipantStats
 	FlashSuccess string
 	FlashError   string
 }
 
 type AdminEventCreateData struct {
-	AdminUser string
-	AdminRole string
-	Errors    []string
-	Form      map[string]string
-	Stats     *services.ParticipantStats
+	AdminBase
+	Errors []string
+	Form   map[string]string
 }
 
 type AdminEventEditData struct {
-	AdminUser string
-	AdminRole string
-	Event     *models.Event
-	Errors    []string
-	Form      map[string]string
-	Stats     *services.ParticipantStats
+	AdminBase
+	Event  *models.Event
+	Errors []string
+	Form   map[string]string
 }
 
 type AdminEventDetailData struct {
-	AdminUser    string
-	AdminRole    string
+	AdminBase
 	Event        *models.Event
-	Stats        *services.ParticipantStats
 	FlashSuccess string
 	FlashError   string
 }
 
 type AdminAdminsData struct {
-	AdminUser string
-	AdminRole string
-	Admins    []models.Admin
-	Stats     *services.ParticipantStats
+	AdminBase
+	Admins []models.Admin
 }
 
 type AdminAdminCreateData struct {
-	AdminUser string
-	AdminRole string
-	Errors    []string
-	Form      map[string]string
-	Stats     *services.ParticipantStats
+	AdminBase
+	Errors []string
+	Form   map[string]string
 }
 
 type AdminAdminEditData struct {
-	AdminUser string
-	AdminRole string
-	Admin     *models.Admin
-	Errors    []string
-	Form      map[string]string
-	Stats     *services.ParticipantStats
+	AdminBase
+	Admin  *models.Admin
+	Errors []string
+	Form   map[string]string
 }
 
 type AdminSettingsData struct {
-	AdminUser           string
-	AdminRole           string
+	AdminBase
 	SiteName            string
 	SiteDescription     string
 	FooterText          string
@@ -167,34 +153,28 @@ type AdminSettingsData struct {
 	StoragePath         string
 	SuccessMessage      string
 	Errors              []string
-	Stats               *services.ParticipantStats
 }
 
 type AdminBackupsData struct {
-	AdminUser    string
-	AdminRole    string
+	AdminBase
 	Backups      []services.BackupInfo
-	Stats        *services.ParticipantStats
 	FlashSuccess string
 	FlashError   string
 }
 
 type AdminCheckinData struct {
-	AdminUser    string
-	AdminRole    string
+	AdminBase
 	Participants []models.Participant
-	Stats        *services.ParticipantStats
 	Search       string
 	FlashSuccess string
 	FlashError   string
 }
 
 type AdminSystemHealthData struct {
-	AdminUser string
-	AdminRole string
-	Health    *services.HealthReport
-	Stats     *services.ParticipantStats
+	AdminBase
+	Health *services.HealthReport
 }
+
 
 // ─────────────────────── Handler ───────────────────────
 
@@ -262,6 +242,7 @@ func NewAdminHandler(
 		"admin_broadcast_create.html",
 		"admin_broadcast_detail.html",
 		"admin_system.html",
+		"admin_sidebar.html",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse admin templates: %w", err)
@@ -384,9 +365,12 @@ func (h *AdminHandler) Dashboard(c *fiber.Ctx) error {
 	adminRole, _ := c.Locals("admin_role").(string)
 
 	return h.render(c, "admin_dashboard.html", AdminDashboardData{
-		AdminUser:           adminUser,
-		AdminRole:           adminRole,
-		Stats:               stats,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "dashboard",
+			Stats:      stats,
+		},
 		RecentRegistrations: recentRegs,
 		RecentVerifications: recentVerifs,
 		Events:              events,
@@ -476,10 +460,13 @@ func (h *AdminHandler) ParticipantList(c *fiber.Ctx) error {
 	adminRole, _ := c.Locals("admin_role").(string)
 
 	return h.render(c, "admin_participants.html", AdminParticipantsData{
-		AdminUser:      adminUser,
-		AdminRole:      adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "participants",
+			Stats:          stats,
+		},
 		Participants:   participants,
-		Stats:          stats,
 		Filter:         filter,
 		Search:         search,
 		Event:          event,
@@ -526,12 +513,15 @@ func (h *AdminHandler) ParticipantDetail(c *fiber.Ctx) error {
 	stats, _ := h.participantService.GetStats()
 
 	return h.render(c, "admin_participant.html", AdminParticipantDetailData{
-		AdminUser:   adminUser,
-		AdminRole:   adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "participants",
+			Stats:       stats,
+		},
 		Participant: participant,
 		Event:       event,
 		PaymentURL:  paymentURL,
-		Stats:       stats,
 	})
 }
 
@@ -743,10 +733,13 @@ func (h *AdminHandler) EventList(c *fiber.Ctx) error {
 	adminRole, _ := c.Locals("admin_role").(string)
 	stats, _ := h.participantService.GetStats()
 	return h.render(c, "admin_events.html", AdminEventsData{
-		AdminUser:    adminUser,
-		AdminRole:    adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "events",
+			Stats:        stats,
+		},
 		Events:       events,
-		Stats:        stats,
 		FlashSuccess: getFlash(c, "success"),
 		FlashError:   getFlash(c, "error"),
 	})
@@ -758,10 +751,13 @@ func (h *AdminHandler) EventCreatePage(c *fiber.Ctx) error {
 	adminRole, _ := c.Locals("admin_role").(string)
 	stats, _ := h.participantService.GetStats()
 	return h.render(c, "admin_event_create.html", AdminEventCreateData{
-		AdminUser: adminUser,
-		AdminRole: adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "events",
+			Stats:     stats,
+		},
 		Form:      map[string]string{},
-		Stats:     stats,
 	})
 }
 
@@ -905,11 +901,14 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 	if len(errs) > 0 {
 		stats, _ := h.participantService.GetStats()
 		return h.render(c, "admin_event_create.html", AdminEventCreateData{
-			AdminUser: adminUser,
-			AdminRole: adminRole,
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "events",
+				Stats:     stats,
+			},
 			Errors:    errs,
 			Form:      formValues,
-			Stats:     stats,
 		})
 	}
 
@@ -937,11 +936,14 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 		errs = append(errs, "Gagal menyimpan Acara: "+err.Error())
 		stats, _ := h.participantService.GetStats()
 		return h.render(c, "admin_event_create.html", AdminEventCreateData{
-			AdminUser: adminUser,
-			AdminRole: adminRole,
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "events",
+				Stats:     stats,
+			},
 			Errors:    errs,
 			Form:      formValues,
-			Stats:     stats,
 		})
 	}
 
@@ -994,11 +996,14 @@ func (h *AdminHandler) EventEditPage(c *fiber.Ctx) error {
 	stats, _ := h.participantService.GetStats()
 
 	return h.render(c, "admin_event_edit.html", AdminEventEditData{
-		AdminUser: adminUser,
-		AdminRole: adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "events",
+			Stats:     stats,
+		},
 		Event:     event,
 		Form:      formValues,
-		Stats:     stats,
 	})
 }
 
@@ -1156,12 +1161,15 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 	if len(errs) > 0 {
 		stats, _ := h.participantService.GetStats()
 		return h.render(c, "admin_event_edit.html", AdminEventEditData{
-			AdminUser: adminUser,
-			AdminRole: adminRole,
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "events",
+				Stats:     stats,
+			},
 			Event:     event,
 			Errors:    errs,
 			Form:      formValues,
-			Stats:     stats,
 		})
 	}
 
@@ -1187,12 +1195,15 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 		errs = append(errs, "Gagal memperbarui Acara: "+err.Error())
 		stats, _ := h.participantService.GetStats()
 		return h.render(c, "admin_event_edit.html", AdminEventEditData{
-			AdminUser: adminUser,
-			AdminRole: adminRole,
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "events",
+				Stats:     stats,
+			},
 			Event:     event,
 			Errors:    errs,
 			Form:      formValues,
-			Stats:     stats,
 		})
 	}
 
@@ -1258,10 +1269,13 @@ func (h *AdminHandler) EventDetail(c *fiber.Ctx) error {
 	stats, _ := h.participantService.GetStats()
 
 	return h.render(c, "admin_event.html", AdminEventDetailData{
-		AdminUser:    adminUser,
-		AdminRole:    adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "events",
+			Stats:        stats,
+		},
 		Event:        event,
-		Stats:        stats,
 		FlashSuccess: getFlash(c, "success"),
 		FlashError:   getFlash(c, "error"),
 	})
@@ -1466,10 +1480,13 @@ func (h *AdminHandler) AdminList(c *fiber.Ctx) error {
 	stats, _ := h.participantService.GetStats()
 
 	return h.render(c, "admin_admins.html", AdminAdminsData{
-		AdminUser: adminUser,
-		AdminRole: adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "admins",
+			Stats:     stats,
+		},
 		Admins:    admins,
-		Stats:     stats,
 	})
 }
 
@@ -1480,10 +1497,13 @@ func (h *AdminHandler) AdminCreatePage(c *fiber.Ctx) error {
 	stats, _ := h.participantService.GetStats()
 
 	return h.render(c, "admin_admin_create.html", AdminAdminCreateData{
-		AdminUser: adminUser,
-		AdminRole: adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "admins",
+			Stats:     stats,
+		},
 		Form:      map[string]string{},
-		Stats:     stats,
 	})
 }
 
@@ -1537,11 +1557,14 @@ func (h *AdminHandler) AdminCreateSubmit(c *fiber.Ctx) error {
 
 	if len(errs) > 0 {
 		return h.render(c, "admin_admin_create.html", AdminAdminCreateData{
-			AdminUser: adminUser,
-			AdminRole: adminRole,
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "admins",
+				Stats:     stats,
+			},
 			Errors:    errs,
 			Form:      formValues,
-			Stats:     stats,
 		})
 	}
 
@@ -1550,11 +1573,14 @@ func (h *AdminHandler) AdminCreateSubmit(c *fiber.Ctx) error {
 	if err != nil {
 		errs = append(errs, "Gagal memproses password: "+err.Error())
 		return h.render(c, "admin_admin_create.html", AdminAdminCreateData{
-			AdminUser: adminUser,
-			AdminRole: adminRole,
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "admins",
+				Stats:     stats,
+			},
 			Errors:    errs,
 			Form:      formValues,
-			Stats:     stats,
 		})
 	}
 
@@ -1569,11 +1595,14 @@ func (h *AdminHandler) AdminCreateSubmit(c *fiber.Ctx) error {
 	if err := h.adminService.CreateAdmin(newAdmin); err != nil {
 		errs = append(errs, "Gagal membuat Admin: "+err.Error())
 		return h.render(c, "admin_admin_create.html", AdminAdminCreateData{
-			AdminUser: adminUser,
-			AdminRole: adminRole,
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "admins",
+				Stats:     stats,
+			},
 			Errors:    errs,
 			Form:      formValues,
-			Stats:     stats,
 		})
 	}
 
@@ -1604,11 +1633,14 @@ func (h *AdminHandler) AdminEditPage(c *fiber.Ctx) error {
 	}
 
 	return h.render(c, "admin_admin_edit.html", AdminAdminEditData{
-		AdminUser: adminUser,
-		AdminRole: adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "admins",
+			Stats:     stats,
+		},
 		Admin:     admin,
 		Form:      formValues,
-		Stats:     stats,
 	})
 }
 
@@ -1660,12 +1692,15 @@ func (h *AdminHandler) AdminEditSubmit(c *fiber.Ctx) error {
 
 	if len(errs) > 0 {
 		return h.render(c, "admin_admin_edit.html", AdminAdminEditData{
-			AdminUser: adminUser,
-			AdminRole: adminRole,
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "admins",
+				Stats:     stats,
+			},
 			Admin:     admin,
 			Errors:    errs,
 			Form:      formValues,
-			Stats:     stats,
 		})
 	}
 
@@ -1678,12 +1713,15 @@ func (h *AdminHandler) AdminEditSubmit(c *fiber.Ctx) error {
 		if err != nil {
 			errs = append(errs, "Gagal memproses password baru: "+err.Error())
 			return h.render(c, "admin_admin_edit.html", AdminAdminEditData{
-				AdminUser: adminUser,
-				AdminRole: adminRole,
+				AdminBase: AdminBase{
+					AdminUser:  adminUser,
+					AdminRole:  adminRole,
+					ActiveMenu: "admins",
+					Stats:     stats,
+				},
 				Admin:     admin,
 				Errors:    errs,
 				Form:      formValues,
-				Stats:     stats,
 			})
 		}
 		admin.PasswordHash = string(hash)
@@ -1692,12 +1730,15 @@ func (h *AdminHandler) AdminEditSubmit(c *fiber.Ctx) error {
 	if err := h.adminService.UpdateAdmin(admin); err != nil {
 		errs = append(errs, "Gagal memperbarui Admin: "+err.Error())
 		return h.render(c, "admin_admin_edit.html", AdminAdminEditData{
-			AdminUser: adminUser,
-			AdminRole: adminRole,
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "admins",
+				Stats:     stats,
+			},
 			Admin:     admin,
 			Errors:    errs,
 			Form:      formValues,
-			Stats:     stats,
 		})
 	}
 
@@ -1746,8 +1787,12 @@ func (h *AdminHandler) SystemSettingsPage(c *fiber.Ctx) error {
 	stats, _ := h.participantService.GetStats()
 
 	return h.render(c, "admin_settings.html", AdminSettingsData{
-		AdminUser:           adminUser,
-		AdminRole:           adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "settings",
+			Stats:               stats,
+		},
 		SiteName:            h.settingsService.Get("site_name"),
 		SiteDescription:     h.settingsService.Get("site_description"),
 		FooterText:          h.settingsService.Get("footer_text"),
@@ -1759,7 +1804,6 @@ func (h *AdminHandler) SystemSettingsPage(c *fiber.Ctx) error {
 		WhatsAppEnabled:     h.settingsService.GetBool("whatsapp_enabled"),
 		NotificationEnabled: h.settingsService.GetBool("notification_enabled"),
 		StoragePath:         h.settingsService.Get("storage_path"),
-		Stats:               stats,
 	})
 }
 
@@ -1804,8 +1848,12 @@ func (h *AdminHandler) SystemSettingsSubmit(c *fiber.Ctx) error {
 
 	if len(errs) > 0 {
 		return h.render(c, "admin_settings.html", AdminSettingsData{
-			AdminUser:           adminUser,
-			AdminRole:           adminRole,
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "settings",
+				Stats:               stats,
+			},
 			SiteName:            siteName,
 			SiteDescription:     siteDescription,
 			FooterText:          footerText,
@@ -1818,7 +1866,6 @@ func (h *AdminHandler) SystemSettingsSubmit(c *fiber.Ctx) error {
 			NotificationEnabled: notificationEnabled,
 			StoragePath:         storagePath,
 			Errors:              errs,
-			Stats:               stats,
 		})
 	}
 
@@ -1853,8 +1900,12 @@ func (h *AdminHandler) SystemSettingsSubmit(c *fiber.Ctx) error {
 
 	if err := h.settingsService.UpdateMany(newSettings); err != nil {
 		return h.render(c, "admin_settings.html", AdminSettingsData{
-			AdminUser:           adminUser,
-			AdminRole:           adminRole,
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "settings",
+				Stats:               stats,
+			},
 			SiteName:            siteName,
 			SiteDescription:     siteDescription,
 			FooterText:          footerText,
@@ -1867,7 +1918,6 @@ func (h *AdminHandler) SystemSettingsSubmit(c *fiber.Ctx) error {
 			NotificationEnabled: notificationEnabled,
 			StoragePath:         storagePath,
 			Errors:              []string{"Gagal menyimpan pengaturan: " + err.Error()},
-			Stats:               stats,
 		})
 	}
 
@@ -1879,8 +1929,12 @@ func (h *AdminHandler) SystemSettingsSubmit(c *fiber.Ctx) error {
 	}
 
 	return h.render(c, "admin_settings.html", AdminSettingsData{
-		AdminUser:           adminUser,
-		AdminRole:           adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "settings",
+			Stats:               stats,
+		},
 		SiteName:            siteName,
 		SiteDescription:     siteDescription,
 		FooterText:          footerText,
@@ -1893,7 +1947,6 @@ func (h *AdminHandler) SystemSettingsSubmit(c *fiber.Ctx) error {
 		NotificationEnabled: notificationEnabled,
 		StoragePath:         storagePath,
 		SuccessMessage:      "Pengaturan sistem berhasil disimpan!",
-		Stats:               stats,
 	})
 }
 
@@ -2005,6 +2058,9 @@ func buildAdminFuncMap() template.FuncMap {
 			}
 			return fallback
 		},
+		"sidebarItems": func(role string, active string, stats *services.ParticipantStats) []MenuItem {
+			return BuildSidebarItems(role, active, stats)
+		},
 	}
 }
 
@@ -2021,19 +2077,20 @@ func (h *AdminHandler) NotificationList(c *fiber.Ctx) error {
 	adminRole, _ := c.Locals("admin_role").(string)
 
 	return h.render(c, "admin_notifications.html", AdminNotificationsData{
-		AdminUser: adminUser,
-		AdminRole: adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "notifications",
+			Stats:     stats,
+		},
 		Logs:      logs,
-		Stats:     stats,
 		Event:     event,
 	})
 }
 
 type AdminAuditLogsData struct {
-	AdminUser      string
-	AdminRole      string
+	AdminBase
 	Logs           []models.AuditLog
-	Stats          *services.ParticipantStats
 	Search         string
 	FilterResource string
 	FilterAction   string
@@ -2059,10 +2116,13 @@ func (h *AdminHandler) AuditLogList(c *fiber.Ctx) error {
 	adminRole, _ := c.Locals("admin_role").(string)
 
 	return h.render(c, "admin_audit_logs.html", AdminAuditLogsData{
-		AdminUser:      adminUser,
-		AdminRole:      adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "audit-logs",
+			Stats:          stats,
+		},
 		Logs:           logs,
-		Stats:          stats,
 		Search:         search,
 		FilterResource: resourceFilter,
 		FilterAction:   actionFilter,
@@ -2072,12 +2132,10 @@ func (h *AdminHandler) AuditLogList(c *fiber.Ctx) error {
 }
 
 type AdminParticipantQRData struct {
-	AdminUser   string
-	AdminRole   string
+	AdminBase
 	Participant *models.Participant
 	Event       *models.Event
 	QRToken     string
-	Stats       *services.ParticipantStats
 }
 
 // ParticipantQRPage handles GET /admin/participants/:id/qr
@@ -2108,12 +2166,15 @@ func (h *AdminHandler) ParticipantQRPage(c *fiber.Ctx) error {
 	stats, _ := h.participantService.GetStats()
 
 	return h.render(c, "admin_participant_qr.html", AdminParticipantQRData{
-		AdminUser:   adminUser,
-		AdminRole:   adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "participants",
+			Stats:       stats,
+		},
 		Participant: participant,
 		Event:       &participant.Event,
 		QRToken:     token,
-		Stats:       stats,
 	})
 }
 
@@ -2130,10 +2191,13 @@ func (h *AdminHandler) BackupsPage(c *fiber.Ctx) error {
 	}
 
 	return h.render(c, "admin_backups.html", AdminBackupsData{
-		AdminUser:    adminUser,
-		AdminRole:    adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "backups",
+			Stats:        stats,
+		},
 		Backups:      backups,
-		Stats:        stats,
 		FlashSuccess: getFlash(c, "success"),
 		FlashError:   getFlash(c, "error"),
 	})
@@ -2281,10 +2345,13 @@ func (h *AdminHandler) CheckinPage(c *fiber.Ctx) error {
 	stats, _ := h.participantService.GetStats()
 
 	return h.render(c, "admin_checkin.html", AdminCheckinData{
-		AdminUser:    adminUser,
-		AdminRole:    adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "checkin",
+			Stats:        stats,
+		},
 		Participants: participants,
-		Stats:        stats,
 		Search:       search,
 		FlashSuccess: getFlash(c, "success"),
 		FlashError:   getFlash(c, "error"),
@@ -2323,10 +2390,8 @@ func (h *AdminHandler) CheckinSubmit(c *fiber.Ctx) error {
 
 // AdminAttendanceData contains all the data needed for the attendance dashboard template.
 type AdminAttendanceData struct {
-	AdminUser       string
-	AdminRole       string
+	AdminBase
 	Events          []models.Event
-	Stats           *services.ParticipantStats
 	Checkins        []models.Attendance
 	SelectedEventID uint
 	SelectedDate    string
@@ -2367,10 +2432,13 @@ func (h *AdminHandler) AttendanceDashboard(c *fiber.Ctx) error {
 	}
 
 	data := AdminAttendanceData{
-		AdminUser:       adminUser,
-		AdminRole:       adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "attendance",
+			Stats:           stats,
+		},
 		Events:          events,
-		Stats:           stats,
 		Checkins:        checkins,
 		SelectedEventID: eventID,
 		SelectedDate:    date,
@@ -2394,10 +2462,13 @@ func (h *AdminHandler) BroadcastList(c *fiber.Ctx) error {
 	if err != nil {
 		broadcasts = []models.Broadcast{}
 	}
+	stats, _ := h.participantService.GetStats()
 
 	data := fiber.Map{
 		"AdminUser":  adminUser,
 		"AdminRole":  adminRole,
+		"ActiveMenu": "broadcasts",
+		"Stats":      stats,
 		"Broadcasts": broadcasts,
 	}
 	return h.render(c, "admin_broadcasts.html", data)
@@ -2412,11 +2483,14 @@ func (h *AdminHandler) BroadcastCreatePage(c *fiber.Ctx) error {
 	if err != nil {
 		events = []models.Event{}
 	}
+	stats, _ := h.participantService.GetStats()
 
 	data := fiber.Map{
-		"AdminUser": adminUser,
-		"AdminRole": adminRole,
-		"Events":    events,
+		"AdminUser":  adminUser,
+		"AdminRole":  adminRole,
+		"ActiveMenu": "broadcasts",
+		"Stats":      stats,
+		"Events":     events,
 	}
 	return h.render(c, "admin_broadcast_create.html", data)
 }
@@ -2575,12 +2649,15 @@ func (h *AdminHandler) BroadcastDetail(c *fiber.Ctx) error {
 	if err != nil {
 		logs = []models.NotificationLog{}
 	}
+	stats, _ := h.participantService.GetStats()
 
 	data := fiber.Map{
-		"AdminUser": adminUser,
-		"AdminRole": adminRole,
-		"Broadcast": broadcast,
-		"Logs":      logs,
+		"AdminUser":  adminUser,
+		"AdminRole":  adminRole,
+		"ActiveMenu": "broadcasts",
+		"Stats":      stats,
+		"Broadcast":  broadcast,
+		"Logs":       logs,
 	}
 	return h.render(c, "admin_broadcast_detail.html", data)
 }
@@ -2604,9 +2681,117 @@ func (h *AdminHandler) SystemHealth(c *fiber.Ctx) error {
 	}
 
 	return h.render(c, "admin_system.html", AdminSystemHealthData{
-		AdminUser: adminUser,
-		AdminRole: adminRole,
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "system",
+			Stats:     stats,
+		},
 		Health:    &report,
-		Stats:     stats,
 	})
+}
+
+type MenuItem struct {
+	Title          string
+	URL            string
+	Icon           template.HTML
+	Active         bool
+	Badge          int
+	SuperAdminOnly bool
+	External       bool
+}
+
+func BuildSidebarItems(role string, active string, stats *services.ParticipantStats) []MenuItem {
+	pendingCount := 0
+	if stats != nil {
+		pendingCount = int(stats.Pending)
+	}
+
+	items := []MenuItem{
+		{
+			Title:  "Dashboard",
+			URL:    "/admin/dashboard",
+			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>`,
+			Active: active == "dashboard",
+		},
+		{
+			Title:  "Peserta",
+			URL:    "/admin/participants",
+			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`,
+			Active: active == "participants",
+			Badge:  pendingCount,
+		},
+		{
+			Title:  "Acara",
+			URL:    "/admin/events",
+			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`,
+			Active: active == "events",
+		},
+		{
+			Title:  "Notifikasi",
+			URL:    "/admin/notifications",
+			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>`,
+			Active: active == "notifications",
+		},
+		{
+			Title:  "Log Audit",
+			URL:    "/admin/audit-logs",
+			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>`,
+			Active: active == "audit-logs",
+		},
+		{
+			Title:  "Backup & Restore",
+			URL:    "/admin/backups",
+			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>`,
+			Active: active == "backups",
+		},
+		{
+			Title:  "Check-In Manual",
+			URL:    "/admin/checkin",
+			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>`,
+			Active: active == "checkin",
+		},
+		{
+			Title:  "Kehadiran Real-time",
+			URL:    "/admin/attendance",
+			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z"/></svg>`,
+			Active: active == "attendance",
+		},
+		{
+			Title:  "Pusat Broadcast",
+			URL:    "/admin/broadcasts",
+			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>`,
+			Active: active == "broadcasts",
+		},
+		{
+			Title:  "Kesehatan Sistem",
+			URL:    "/admin/system",
+			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>`,
+			Active: active == "system",
+		},
+	}
+
+	if role == "SUPER_ADMIN" {
+		items = append(items, MenuItem{
+			Title:  "Kelola Admin",
+			URL:    "/admin/admins",
+			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>`,
+			Active: active == "admins",
+		})
+		items = append(items, MenuItem{
+			Title:  "Pengaturan",
+			URL:    "/admin/settings",
+			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`,
+			Active: active == "settings",
+		})
+	}
+
+	items = append(items, MenuItem{
+		Title:    "Halaman Publik",
+		URL:      "/",
+		Icon:     `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>`,
+		External: true,
+	})
+
+	return items
 }

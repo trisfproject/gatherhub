@@ -1,0 +1,51 @@
+{{define "admin_sidebar"}}
+<aside class="sidebar flex flex-col" id="admin-sidebar">
+  <!-- Logo -->
+  <div class="px-6 py-6 border-b border-white/7">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+      </div>
+      <div>
+        <p class="font-bold text-sm text-white">{{setting "site_name"}}</p>
+        <p class="text-xs text-white/30 font-medium">Panel Admin</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nav links — ORDER IS CANONICAL. Do NOT edit individual templates. -->
+  <nav class="flex-1 px-3 py-5 space-y-1" id="admin-nav">
+    <p class="text-xs text-white/20 font-bold uppercase tracking-widest px-3 mb-3">Menu</p>
+
+    {{range sidebarItems .AdminRole .ActiveMenu .Stats}}
+    <a href="{{.URL}}" class="nav-item{{if .Active}} active{{end}}"{{if .External}} target="_blank"{{end}}>
+      {{.Icon}}
+      {{.Title}}
+      {{if gt .Badge 0}}
+      <span class="ml-auto bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold px-2 py-0.5 rounded-full">{{.Badge}}</span>
+      {{end}}
+    </a>
+    {{end}}
+  </nav>
+
+  <!-- Admin user -->
+  <div class="px-3 py-4 border-t border-white/7">
+    <div class="flex items-center gap-3 px-3 py-2.5">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-bold">
+        {{slice .AdminUser 0 1 | printf "%s"}}
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-white truncate">{{.AdminUser}}</p>
+        <p class="text-xs text-white/30 truncate">{{.AdminRole}}</p>
+      </div>
+      <a href="/admin/logout" title="Keluar" class="text-white/30 hover:text-red-400 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+</aside>
+{{end}}
