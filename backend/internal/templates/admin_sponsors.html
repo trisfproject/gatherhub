@@ -45,13 +45,13 @@
   <div class="topbar">
     <div>
       <h2 class="text-base font-bold text-white">Sponsor & Partner</h2>
-      <p class="text-xs text-white/30">Kelola daftar sponsor dan partner untuk setiap acara</p>
+      <p class="text-xs text-white/30 font-medium">Kelola daftar sponsor dan partner untuk {{if .SelectedEvent}}{{.SelectedEvent.Title}}{{else}}Semua Acara{{end}}</p>
     </div>
     <div class="flex items-center gap-3">
       <div class="flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-3 py-1.5">
         <span class="text-xs text-indigo-300 font-bold">{{.AdminRole}}</span>
       </div>
-      <a href="/admin/sponsors/create"
+      <a href="/admin/sponsors/create{{if gt .SelectedEventID 0}}?event_id={{.SelectedEventID}}{{end}}"
          class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-xl text-sm transition-colors"
          id="btn-add-sponsor">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,6 +84,28 @@
       </div>
     </div>
     {{end}}
+
+    <!-- Filter Bar -->
+    <div class="glass p-4 mb-6 fade-up">
+      <form method="GET" action="/admin/sponsors" class="flex flex-col lg:flex-row lg:items-end gap-4">
+        <!-- Event Dropdown -->
+        <div class="flex-1">
+          <label class="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Pilih Acara</label>
+          <select name="event_id" onchange="this.form.submit()" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors">
+            <option value="0" {{if eq .SelectedEventID 0}}selected{{end}} class="bg-[#13132b] text-white">Semua Acara</option>
+            {{range .Events}}
+            <option value="{{.ID}}" {{if eq $.SelectedEventID .ID}}selected{{end}} class="bg-[#13132b] text-white">{{.Title}}</option>
+            {{end}}
+          </select>
+        </div>
+
+        <div>
+          <a href="/admin/sponsors" class="block text-center bg-white/5 hover:bg-white/10 text-white/60 font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors border border-white/5">
+            Reset
+          </a>
+        </div>
+      </form>
+    </div>
 
     {{if .Sponsors}}
     <div class="glass overflow-hidden fade-up">

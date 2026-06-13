@@ -63,3 +63,10 @@ func (s *SponsorService) GetCountByEvent(eventID uint) (int64, error) {
 	result := s.db.Model(&models.Sponsor{}).Where("event_id = ?", eventID).Count(&count)
 	return count, result.Error
 }
+
+// GetSponsorsByEvent returns all sponsors (active/inactive) for a specific event
+func (s *SponsorService) GetSponsorsByEvent(eventID uint) ([]models.Sponsor, error) {
+	var sponsors []models.Sponsor
+	result := s.db.Preload("Event").Where("event_id = ?", eventID).Order("display_order ASC, name ASC").Find(&sponsors)
+	return sponsors, result.Error
+}

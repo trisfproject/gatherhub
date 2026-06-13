@@ -96,9 +96,12 @@ type AdminTaskEditData struct {
 
 type AdminSponsorsData struct {
 	AdminBase
-	Sponsors     []models.Sponsor
-	FlashSuccess string
-	FlashError   string
+	Sponsors        []models.Sponsor
+	Events          []models.Event
+	SelectedEventID uint
+	SelectedEvent   *models.Event
+	FlashSuccess    string
+	FlashError      string
 }
 
 type AdminSponsorCreateData struct {
@@ -3525,7 +3528,30 @@ func (h *AdminHandler) SponsorList(c *fiber.Ctx) error {
 	adminUser, _ := c.Locals("admin_username").(string)
 	adminRole, _ := c.Locals("admin_role").(string)
 
-	sponsors, err := h.sponsorService.GetAllForAdmin()
+	events, _ := h.eventService.GetAll()
+	eventIDStr := c.Query("event_id")
+	var selectedEventID uint
+	if eventIDStr != "" {
+		if id, err := strconv.Atoi(eventIDStr); err == nil && id > 0 {
+			selectedEventID = uint(id)
+		}
+	}
+
+	var selectedEvent *models.Event
+	for i := range events {
+		if events[i].ID == selectedEventID {
+			selectedEvent = &events[i]
+			break
+		}
+	}
+
+	var sponsors []models.Sponsor
+	var err error
+	if selectedEventID > 0 {
+		sponsors, err = h.sponsorService.GetSponsorsByEvent(selectedEventID)
+	} else {
+		sponsors, err = h.sponsorService.GetAllForAdmin()
+	}
 	if err != nil {
 		sponsors = []models.Sponsor{}
 	}
@@ -3539,9 +3565,12 @@ func (h *AdminHandler) SponsorList(c *fiber.Ctx) error {
 			ActiveMenu: "sponsors",
 			Stats:      stats,
 		},
-		Sponsors:     sponsors,
-		FlashSuccess: getFlash(c, "success"),
-		FlashError:   getFlash(c, "error"),
+		Sponsors:        sponsors,
+		Events:          events,
+		SelectedEventID: selectedEventID,
+		SelectedEvent:   selectedEvent,
+		FlashSuccess:    getFlash(c, "success"),
+		FlashError:      getFlash(c, "error"),
 	})
 }
 
@@ -3553,6 +3582,15 @@ func (h *AdminHandler) SponsorCreatePage(c *fiber.Ctx) error {
 	events, _ := h.eventService.GetAll()
 	stats, _ := h.participantService.GetStats()
 
+	eventIDStr := c.Query("event_id")
+	formValues := map[string]string{
+		"active":        "true",
+		"display_order": "0",
+	}
+	if eventIDStr != "" {
+		formValues["event_id"] = eventIDStr
+	}
+
 	return h.render(c, "admin_sponsor_create.html", AdminSponsorCreateData{
 		AdminBase: AdminBase{
 			AdminUser:  adminUser,
@@ -3561,7 +3599,7 @@ func (h *AdminHandler) SponsorCreatePage(c *fiber.Ctx) error {
 			Stats:      stats,
 		},
 		Events:       events,
-		Form:         map[string]string{"active": "true", "display_order": "0"},
+		Form:         formValues,
 		FlashSuccess: getFlash(c, "success"),
 		FlashError:   getFlash(c, "error"),
 	})
@@ -3595,6 +3633,11 @@ func (h *AdminHandler) SponsorCreateSubmit(c *fiber.Ctx) error {
 		eventID, err = strconv.Atoi(eventIDStr)
 		if err != nil || eventID <= 0 {
 			errs = append(errs, "Pilihan Acara tidak valid")
+		} else {
+			_, err = h.eventService.GetByID(uint(eventID))
+			if err != nil {
+				errs = append(errs, "Acara tidak ditemukan")
+			}
 		}
 	} else {
 		errs = append(errs, "Acara wajib dipilih")
@@ -3781,6 +3824,11 @@ func (h *AdminHandler) SponsorEditSubmit(c *fiber.Ctx) error {
 		eventID, err = strconv.Atoi(eventIDStr)
 		if err != nil || eventID <= 0 {
 			errs = append(errs, "Pilihan Acara tidak valid")
+		} else {
+			_, err = h.eventService.GetByID(uint(eventID))
+			if err != nil {
+				errs = append(errs, "Acara tidak ditemukan")
+			}
 		}
 	} else {
 		errs = append(errs, "Acara wajib dipilih")
