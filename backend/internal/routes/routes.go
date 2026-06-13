@@ -24,6 +24,7 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	broadcastService := services.NewBroadcastService(db, notificationService, auditLogService)
 	healthService := services.NewHealthService(db, settingsService.Get("storage_path"))
 	sponsorService := services.NewSponsorService(db)
+	taskService := services.NewTaskService(db)
 
 	adminService := services.NewAdminService(db)
 	if err := adminService.SeedDefaultAdmin(); err != nil {
@@ -38,7 +39,7 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 		log.Fatalf("Failed to initialise page handler: %v", err)
 	}
 
-	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storageService, notificationService, auditLogService, checkinService, settingsService, backupService, broadcastService, healthService, sponsorService)
+	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storageService, notificationService, auditLogService, checkinService, settingsService, backupService, broadcastService, healthService, sponsorService, taskService)
 	if err != nil {
 		log.Fatalf("Failed to initialise admin handler: %v", err)
 	}
@@ -149,6 +150,14 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	admin.Get("/sponsors/:id/edit", adminHandler.SponsorEditPage)
 	admin.Post("/sponsors/:id/edit", adminHandler.SponsorEditSubmit)
 	admin.Post("/sponsors/:id/delete", adminHandler.SponsorDelete)
+
+	// Task management routes
+	admin.Get("/tasks", adminHandler.TaskList)
+	admin.Get("/tasks/create", adminHandler.TaskCreatePage)
+	admin.Post("/tasks/create", adminHandler.TaskCreateSubmit)
+	admin.Get("/tasks/:id/edit", adminHandler.TaskEditPage)
+	admin.Post("/tasks/:id/edit", adminHandler.TaskEditSubmit)
+	admin.Post("/tasks/:id/delete", adminHandler.TaskDelete)
 
 	// Admin management & settings (SUPER_ADMIN only)
 	superAdmin := admin.Group("/", middleware.RequireRole(store, "SUPER_ADMIN"))

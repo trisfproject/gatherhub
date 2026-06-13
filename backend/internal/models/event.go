@@ -40,4 +40,5 @@ type Event struct {
 	// Associations
 	Participants []Participant `json:"participants,omitempty" gorm:"foreignKey:EventID"`
 	Sponsors     []Sponsor     `json:"sponsors,omitempty" gorm:"foreignKey:EventID"`
+	Tasks        []Task        `json:"tasks,omitempty" gorm:"foreignKey:EventID"`
 }

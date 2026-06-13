@@ -24,6 +24,7 @@ var canonicalMenuOrder = []string{
 	"/admin/broadcasts",
 	"/admin/transportation",
 	"/admin/sponsors",
+	"/admin/tasks",
 	"/admin/system",
 	// /admin/admins and /admin/settings are SUPER_ADMIN only (conditional)
 	// /  is "Halaman Publik" — external link

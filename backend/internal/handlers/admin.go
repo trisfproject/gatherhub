@@ -49,6 +49,42 @@ type AdminDashboardData struct {
 	EndDate             string
 	AnalyticsJSON       string
 	SponsorCount        int
+	OpenTasksCount      int
+	OverdueTasksCount   int
+	CompletedTasksCount int
+	TasksJSON           string
+}
+
+type AdminTasksData struct {
+	AdminBase
+	Tasks           []models.Task
+	Events          []models.Event
+	SelectedEventID uint
+	SelectedEvent   *models.Event
+	CategoryFilter  string
+	PriorityFilter  string
+	StatusFilter    string
+	FlashSuccess    string
+	FlashError      string
+}
+
+type AdminTaskCreateData struct {
+	AdminBase
+	Events       []models.Event
+	Errors       []string
+	Form         map[string]string
+	FlashSuccess string
+	FlashError   string
+}
+
+type AdminTaskEditData struct {
+	AdminBase
+	Task         *models.Task
+	Events       []models.Event
+	Errors       []string
+	Form         map[string]string
+	FlashSuccess string
+	FlashError   string
 }
 
 type AdminSponsorsData struct {
@@ -222,6 +258,7 @@ type AdminHandler struct {
 	broadcastService    *services.BroadcastService
 	healthService       *services.HealthService
 	sponsorService      *services.SponsorService
+	taskService         *services.TaskService
 	tmpl                *template.Template
 }
 
@@ -240,6 +277,7 @@ func NewAdminHandler(
 	broadcastService *services.BroadcastService,
 	healthService *services.HealthService,
 	sponsorService *services.SponsorService,
+	taskService *services.TaskService,
 ) (*AdminHandler, error) {
 	funcMap := buildAdminFuncMap()
 	funcMap["setting"] = func(key string) string {
@@ -277,6 +315,9 @@ func NewAdminHandler(
 		"admin_sponsors.html",
 		"admin_sponsor_create.html",
 		"admin_sponsor_edit.html",
+		"admin_tasks.html",
+		"admin_task_create.html",
+		"admin_task_edit.html",
 		"admin_sidebar.html",
 	)
 	if err != nil {
@@ -296,6 +337,7 @@ func NewAdminHandler(
 		broadcastService:    broadcastService,
 		healthService:       healthService,
 		sponsorService:      sponsorService,
+		taskService:         taskService,
 		tmpl:                t,
 	}, nil
 }
@@ -398,9 +440,45 @@ func (h *AdminHandler) Dashboard(c *fiber.Ctx) error {
 	}
 
 	sponsorCount := 0
+	openTasksCount := 0
+	overdueTasksCount := 0
+	completedTasksCount := 0
+	tasksJSON := "[]"
+
 	if selectedEventID > 0 {
 		if count, err := h.sponsorService.GetCountByEvent(selectedEventID); err == nil {
 			sponsorCount = int(count)
+		}
+		if open, overdue, completed, err := h.taskService.GetTaskStats(selectedEventID); err == nil {
+			openTasksCount = open
+			overdueTasksCount = overdue
+			completedTasksCount = completed
+		}
+		if tasks, err := h.taskService.GetTasksByEvent(selectedEventID, "", "", ""); err == nil && len(tasks) > 0 {
+			type calendarTask struct {
+				ID         uint   `json:"id"`
+				Title      string `json:"title"`
+				DueDate    string `json:"due_date"`
+				Status     string `json:"status"`
+				Priority   string `json:"priority"`
+				Category   string `json:"category"`
+				AssignedTo string `json:"assigned_to"`
+			}
+			calTasks := make([]calendarTask, len(tasks))
+			for i, t := range tasks {
+				calTasks[i] = calendarTask{
+					ID:         t.ID,
+					Title:      t.Title,
+					DueDate:    t.DueDate.Format("2006-01-02"),
+					Status:     t.Status,
+					Priority:   t.Priority,
+					Category:   t.Category,
+					AssignedTo: t.AssignedTo,
+				}
+			}
+			if bytes, err := json.Marshal(calTasks); err == nil {
+				tasksJSON = string(bytes)
+			}
 		}
 	}
 
@@ -423,6 +501,10 @@ func (h *AdminHandler) Dashboard(c *fiber.Ctx) error {
 		EndDate:             endDate,
 		AnalyticsJSON:       analyticsJSON,
 		SponsorCount:        sponsorCount,
+		OpenTasksCount:      openTasksCount,
+		OverdueTasksCount:   overdueTasksCount,
+		CompletedTasksCount: completedTasksCount,
+		TasksJSON:           tasksJSON,
 	})
 }
 
@@ -2991,6 +3073,12 @@ func BuildSidebarItems(role string, active string, stats *services.ParticipantSt
 			Active: active == "sponsors",
 		},
 		{
+			Title:  "Manajemen Tugas",
+			URL:    "/admin/tasks",
+			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>`,
+			Active: active == "tasks",
+		},
+		{
 			Title:  "Kesehatan Sistem",
 			URL:    "/admin/system",
 			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>`,
@@ -3803,4 +3891,457 @@ func (h *AdminHandler) SponsorDelete(c *fiber.Ctx) error {
 
 	setFlash(c, "success", "Sponsor/Mitra \""+sponsor.Name+"\" berhasil dihapus.")
 	return c.Redirect("/admin/sponsors", fiber.StatusSeeOther)
+}
+
+// TaskList handles GET /admin/tasks
+func (h *AdminHandler) TaskList(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	events, _ := h.eventService.GetAll()
+	eventIDStr := c.Query("event_id")
+	var selectedEventID uint
+	if eventIDStr != "" {
+		if id, err := strconv.Atoi(eventIDStr); err == nil {
+			selectedEventID = uint(id)
+		}
+	} else {
+		// Default to first event
+		if len(events) > 0 {
+			selectedEventID = events[0].ID
+		}
+	}
+
+	var selectedEvent *models.Event
+	for i := range events {
+		if events[i].ID == selectedEventID {
+			selectedEvent = &events[i]
+			break
+		}
+	}
+
+	categoryFilter := c.Query("category")
+	priorityFilter := c.Query("priority")
+	statusFilter := c.Query("status")
+
+	var tasks []models.Task
+	var err error
+	if selectedEventID > 0 {
+		tasks, err = h.taskService.GetTasksByEvent(selectedEventID, categoryFilter, priorityFilter, statusFilter)
+		if err != nil {
+			tasks = []models.Task{}
+		}
+	}
+
+	stats, _ := h.participantService.GetStats()
+
+	return h.render(c, "admin_tasks.html", AdminTasksData{
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "tasks",
+			Stats:      stats,
+		},
+		Tasks:           tasks,
+		Events:          events,
+		SelectedEventID: selectedEventID,
+		SelectedEvent:   selectedEvent,
+		CategoryFilter:  categoryFilter,
+		PriorityFilter:  priorityFilter,
+		StatusFilter:    statusFilter,
+		FlashSuccess:    getFlash(c, "success"),
+		FlashError:      getFlash(c, "error"),
+	})
+}
+
+// TaskCreatePage handles GET /admin/tasks/create
+func (h *AdminHandler) TaskCreatePage(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	events, _ := h.eventService.GetAll()
+	stats, _ := h.participantService.GetStats()
+
+	eventIDStr := c.Query("event_id")
+	formValues := map[string]string{
+		"event_id": eventIDStr,
+		"status":   "Todo",
+	}
+
+	return h.render(c, "admin_task_create.html", AdminTaskCreateData{
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "tasks",
+			Stats:      stats,
+		},
+		Events:       events,
+		Form:         formValues,
+		FlashSuccess: getFlash(c, "success"),
+		FlashError:   getFlash(c, "error"),
+	})
+}
+
+// TaskCreateSubmit handles POST /admin/tasks/create
+func (h *AdminHandler) TaskCreateSubmit(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	eventIDStr := c.FormValue("event_id")
+	title := strings.TrimSpace(c.FormValue("title"))
+	description := strings.TrimSpace(c.FormValue("description"))
+	category := strings.TrimSpace(c.FormValue("category"))
+	priority := strings.TrimSpace(c.FormValue("priority"))
+	dueDateStr := strings.TrimSpace(c.FormValue("due_date"))
+	assignedTo := strings.TrimSpace(c.FormValue("assigned_to"))
+	status := strings.TrimSpace(c.FormValue("status"))
+
+	formValues := map[string]string{
+		"event_id":    eventIDStr,
+		"title":       title,
+		"description": description,
+		"category":    category,
+		"priority":    priority,
+		"due_date":    dueDateStr,
+		"assigned_to": assignedTo,
+		"status":      status,
+	}
+
+	var errs []string
+	var eventID int
+	var err error
+	if eventIDStr != "" {
+		eventID, err = strconv.Atoi(eventIDStr)
+		if err != nil || eventID <= 0 {
+			errs = append(errs, "Pilihan Acara tidak valid")
+		}
+	} else {
+		errs = append(errs, "Acara wajib dipilih")
+	}
+
+	if title == "" {
+		errs = append(errs, "Judul tugas wajib diisi")
+	}
+
+	allowedCategories := map[string]bool{
+		"Registration": true, "Transportation": true, "Merchandise": true,
+		"Sponsor": true, "Venue": true, "Broadcast": true, "Logistics": true, "Other": true,
+	}
+	if category == "" {
+		errs = append(errs, "Kategori wajib diisi")
+	} else if !allowedCategories[category] {
+		errs = append(errs, "Kategori tidak valid")
+	}
+
+	allowedPriorities := map[string]bool{
+		"Low": true, "Medium": true, "High": true, "Critical": true,
+	}
+	if priority == "" {
+		errs = append(errs, "Prioritas wajib diisi")
+	} else if !allowedPriorities[priority] {
+		errs = append(errs, "Prioritas tidak valid")
+	}
+
+	allowedStatuses := map[string]bool{
+		"Todo": true, "In Progress": true, "Done": true, "Cancelled": true,
+	}
+	if status == "" {
+		status = "Todo"
+	} else if !allowedStatuses[status] {
+		errs = append(errs, "Status tidak valid")
+	}
+
+	var dueDate time.Time
+	if dueDateStr == "" {
+		errs = append(errs, "Tanggal Jatuh Tempo wajib diisi")
+	} else {
+		dueDate, err = time.Parse("2006-01-02", dueDateStr)
+		if err != nil {
+			errs = append(errs, "Format Tanggal Jatuh Tempo harus YYYY-MM-DD")
+		}
+	}
+
+	if len(errs) > 0 {
+		events, _ := h.eventService.GetAll()
+		stats, _ := h.participantService.GetStats()
+		return h.render(c, "admin_task_create.html", AdminTaskCreateData{
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "tasks",
+				Stats:      stats,
+			},
+			Events:       events,
+			Errors:       errs,
+			Form:         formValues,
+			FlashSuccess: getFlash(c, "success"),
+			FlashError:   getFlash(c, "error"),
+		})
+	}
+
+	newTask := &models.Task{
+		EventID:     uint(eventID),
+		Title:       title,
+		Description: description,
+		Category:    category,
+		Priority:    priority,
+		DueDate:     dueDate,
+		AssignedTo:  assignedTo,
+		Status:      status,
+	}
+
+	if err := h.taskService.Create(newTask); err != nil {
+		errs = append(errs, "Gagal menyimpan tugas: "+err.Error())
+		events, _ := h.eventService.GetAll()
+		stats, _ := h.participantService.GetStats()
+		return h.render(c, "admin_task_create.html", AdminTaskCreateData{
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "tasks",
+				Stats:      stats,
+			},
+			Events:       events,
+			Errors:       errs,
+			Form:         formValues,
+			FlashSuccess: getFlash(c, "success"),
+			FlashError:   getFlash(c, "error"),
+		})
+	}
+
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, "CREATE", "TASK", newTask.ID, "", newTask, c.IP(), c.Get("User-Agent"))
+	}
+
+	setFlash(c, "success", "Tugas \""+title+"\" berhasil dibuat.")
+	return c.Redirect("/admin/tasks?event_id="+eventIDStr, fiber.StatusSeeOther)
+}
+
+// TaskEditPage handles GET /admin/tasks/:id/edit
+func (h *AdminHandler) TaskEditPage(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		setFlash(c, "error", "ID tugas tidak valid")
+		return c.Redirect("/admin/tasks", fiber.StatusSeeOther)
+	}
+
+	task, err := h.taskService.GetByID(uint(id))
+	if err != nil {
+		setFlash(c, "error", "Tugas tidak ditemukan")
+		return c.Redirect("/admin/tasks", fiber.StatusSeeOther)
+	}
+
+	events, _ := h.eventService.GetAll()
+	stats, _ := h.participantService.GetStats()
+
+	formValues := map[string]string{
+		"event_id":    strconv.Itoa(int(task.EventID)),
+		"title":       task.Title,
+		"description": task.Description,
+		"category":    task.Category,
+		"priority":    task.Priority,
+		"due_date":    task.DueDate.Format("2006-01-02"),
+		"assigned_to": task.AssignedTo,
+		"status":      task.Status,
+	}
+
+	return h.render(c, "admin_task_edit.html", AdminTaskEditData{
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "tasks",
+			Stats:      stats,
+		},
+		Task:         task,
+		Events:       events,
+		Form:         formValues,
+		FlashSuccess: getFlash(c, "success"),
+		FlashError:   getFlash(c, "error"),
+	})
+}
+
+// TaskEditSubmit handles POST /admin/tasks/:id/edit
+func (h *AdminHandler) TaskEditSubmit(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		setFlash(c, "error", "ID tugas tidak valid")
+		return c.Redirect("/admin/tasks", fiber.StatusSeeOther)
+	}
+
+	task, err := h.taskService.GetByID(uint(id))
+	if err != nil {
+		setFlash(c, "error", "Tugas tidak ditemukan")
+		return c.Redirect("/admin/tasks", fiber.StatusSeeOther)
+	}
+
+	oldTaskJSON := ""
+	if bytes, err := json.Marshal(task); err == nil {
+		oldTaskJSON = string(bytes)
+	}
+
+	eventIDStr := c.FormValue("event_id")
+	title := strings.TrimSpace(c.FormValue("title"))
+	description := strings.TrimSpace(c.FormValue("description"))
+	category := strings.TrimSpace(c.FormValue("category"))
+	priority := strings.TrimSpace(c.FormValue("priority"))
+	dueDateStr := strings.TrimSpace(c.FormValue("due_date"))
+	assignedTo := strings.TrimSpace(c.FormValue("assigned_to"))
+	status := strings.TrimSpace(c.FormValue("status"))
+
+	formValues := map[string]string{
+		"event_id":    eventIDStr,
+		"title":       title,
+		"description": description,
+		"category":    category,
+		"priority":    priority,
+		"due_date":    dueDateStr,
+		"assigned_to": assignedTo,
+		"status":      status,
+	}
+
+	var errs []string
+	var eventID int
+	if eventIDStr != "" {
+		eventID, err = strconv.Atoi(eventIDStr)
+		if err != nil || eventID <= 0 {
+			errs = append(errs, "Pilihan Acara tidak valid")
+		}
+	} else {
+		errs = append(errs, "Acara wajib dipilih")
+	}
+
+	if title == "" {
+		errs = append(errs, "Judul tugas wajib diisi")
+	}
+
+	allowedCategories := map[string]bool{
+		"Registration": true, "Transportation": true, "Merchandise": true,
+		"Sponsor": true, "Venue": true, "Broadcast": true, "Logistics": true, "Other": true,
+	}
+	if category == "" {
+		errs = append(errs, "Kategori wajib diisi")
+	} else if !allowedCategories[category] {
+		errs = append(errs, "Kategori tidak valid")
+	}
+
+	allowedPriorities := map[string]bool{
+		"Low": true, "Medium": true, "High": true, "Critical": true,
+	}
+	if priority == "" {
+		errs = append(errs, "Prioritas wajib diisi")
+	} else if !allowedPriorities[priority] {
+		errs = append(errs, "Prioritas tidak valid")
+	}
+
+	allowedStatuses := map[string]bool{
+		"Todo": true, "In Progress": true, "Done": true, "Cancelled": true,
+	}
+	if status == "" {
+		errs = append(errs, "Status tidak valid")
+	} else if !allowedStatuses[status] {
+		errs = append(errs, "Status tidak valid")
+	}
+
+	var dueDate time.Time
+	if dueDateStr == "" {
+		errs = append(errs, "Tanggal Jatuh Tempo wajib diisi")
+	} else {
+		dueDate, err = time.Parse("2006-01-02", dueDateStr)
+		if err != nil {
+			errs = append(errs, "Format Tanggal Jatuh Tempo harus YYYY-MM-DD")
+		}
+	}
+
+	if len(errs) > 0 {
+		events, _ := h.eventService.GetAll()
+		stats, _ := h.participantService.GetStats()
+		return h.render(c, "admin_task_edit.html", AdminTaskEditData{
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "tasks",
+				Stats:      stats,
+			},
+			Task:         task,
+			Events:       events,
+			Errors:       errs,
+			Form:         formValues,
+			FlashSuccess: getFlash(c, "success"),
+			FlashError:   getFlash(c, "error"),
+		})
+	}
+
+	task.EventID = uint(eventID)
+	task.Title = title
+	task.Description = description
+	task.Category = category
+	task.Priority = priority
+	task.DueDate = dueDate
+	task.AssignedTo = assignedTo
+	task.Status = status
+
+	if err := h.taskService.Update(task); err != nil {
+		errs = append(errs, "Gagal menyimpan tugas: "+err.Error())
+		events, _ := h.eventService.GetAll()
+		stats, _ := h.participantService.GetStats()
+		return h.render(c, "admin_task_edit.html", AdminTaskEditData{
+			AdminBase: AdminBase{
+				AdminUser:  adminUser,
+				AdminRole:  adminRole,
+				ActiveMenu: "tasks",
+				Stats:      stats,
+			},
+			Task:         task,
+			Events:       events,
+			Errors:       errs,
+			Form:         formValues,
+			FlashSuccess: getFlash(c, "success"),
+			FlashError:   getFlash(c, "error"),
+		})
+	}
+
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, "UPDATE", "TASK", task.ID, oldTaskJSON, task, c.IP(), c.Get("User-Agent"))
+	}
+
+	setFlash(c, "success", "Tugas \""+title+"\" berhasil diperbarui.")
+	return c.Redirect("/admin/tasks?event_id="+eventIDStr, fiber.StatusSeeOther)
+}
+
+// TaskDelete handles POST /admin/tasks/:id/delete
+func (h *AdminHandler) TaskDelete(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID tidak valid"})
+	}
+
+	task, err := h.taskService.GetByID(uint(id))
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Tugas tidak ditemukan"})
+	}
+
+	taskJSON := ""
+	if bytes, err := json.Marshal(task); err == nil {
+		taskJSON = string(bytes)
+	}
+
+	eventIDStr := strconv.Itoa(int(task.EventID))
+
+	if err := h.taskService.Delete(uint(id)); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghapus tugas: " + err.Error()})
+	}
+
+	adminUser, _ := c.Locals("admin_username").(string)
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, "DELETE", "TASK", uint(id), taskJSON, nil, c.IP(), c.Get("User-Agent"))
+	}
+
+	setFlash(c, "success", "Tugas \""+task.Title+"\" berhasil dihapus.")
+	return c.Redirect("/admin/tasks?event_id="+eventIDStr, fiber.StatusSeeOther)
 }
