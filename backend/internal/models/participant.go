@@ -8,9 +8,10 @@ import (
 type ParticipantStatus string
 
 const (
-	StatusPending  ParticipantStatus = "PENDING"
-	StatusVerified ParticipantStatus = "VERIFIED"
-	StatusRejected ParticipantStatus = "REJECTED"
+	StatusPending   ParticipantStatus = "PENDING"
+	StatusVerified  ParticipantStatus = "VERIFIED"
+	StatusRejected  ParticipantStatus = "REJECTED"
+	StatusCheckedIn ParticipantStatus = "CHECKED_IN"
 )
 
 // Participant represents a person who registered for an event

@@ -115,6 +115,10 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	admin.Post("/backups/upload", adminHandler.UploadRestoreBackup)
 	admin.Post("/backups/delete/:filename", adminHandler.DeleteBackupSubmit)
 
+	// Check-in routes
+	admin.Get("/checkin", adminHandler.CheckinPage)
+	admin.Post("/checkin/:participant_id", adminHandler.CheckinSubmit)
+
 
 	// Admin management & settings (SUPER_ADMIN only)
 	superAdmin := admin.Group("/", middleware.RequireRole(store, "SUPER_ADMIN"))

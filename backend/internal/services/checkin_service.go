@@ -90,34 +90,55 @@ func (s *CheckinService) VerifyQRToken(token string) (*QRPayload, error) {
 }
 
 // Checkin processes a check-in request for a participant.
-func (s *CheckinService) Checkin(participantID, eventID uint) (*models.Attendance, error) {
-	// 1. Get participant
-	var p models.Participant
-	if err := s.db.Preload("Event").First(&p, participantID).Error; err != nil {
-		return nil, errors.New("peserta tidak ditemukan")
-	}
+func (s *CheckinService) Checkin(participantID, eventID uint, checkedInBy string) (*models.Attendance, error) {
+	var att models.Attendance
 
-	// 2. Validate status
-	if p.Status != models.StatusVerified {
-		return nil, errors.New("hanya peserta yang telah VERIFIED yang diperbolehkan check-in")
-	}
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// 1. Get participant
+		var p models.Participant
+		if err := tx.Preload("Event").First(&p, participantID).Error; err != nil {
+			return errors.New("peserta tidak ditemukan")
+		}
 
-	// 3. Prevent duplicate check-in
-	var count int64
-	s.db.Model(&models.Attendance{}).Where("participant_id = ? AND event_id = ?", participantID, eventID).Count(&count)
-	if count > 0 {
-		return nil, errors.New("peserta sudah melakukan check-in sebelumnya")
-	}
+		// 2. Validate status and prevent duplicate check-in
+		if p.Status == models.StatusCheckedIn {
+			return errors.New("Participant already checked in.")
+		}
 
-	// 4. Create attendance record
-	att := models.Attendance{
-		ParticipantID: participantID,
-		EventID:       eventID,
-		CheckedInAt:   time.Now(),
-	}
+		var count int64
+		tx.Model(&models.Attendance{}).Where("participant_id = ? AND event_id = ?", participantID, eventID).Count(&count)
+		if count > 0 {
+			return errors.New("Participant already checked in.")
+		}
 
-	if err := s.db.Create(&att).Error; err != nil {
-		return nil, fmt.Errorf("gagal menyimpan data check-in: %w", err)
+		if p.Status != models.StatusVerified {
+			return errors.New("hanya peserta yang telah VERIFIED yang diperbolehkan check-in")
+		}
+
+		// 3. Update participant status to CHECKED_IN
+		p.Status = models.StatusCheckedIn
+		if err := tx.Save(&p).Error; err != nil {
+			return fmt.Errorf("failed to update participant status: %w", err)
+		}
+
+		// 4. Create attendance record
+		att = models.Attendance{
+			ParticipantID: participantID,
+			EventID:       eventID,
+			CheckedInAt:   time.Now(),
+			CheckedInBy:   checkedInBy,
+			CreatedAt:     time.Now(),
+		}
+
+		if err := tx.Create(&att).Error; err != nil {
+			return fmt.Errorf("gagal menyimpan data check-in: %w", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
 	// Fetch created attendance with associations

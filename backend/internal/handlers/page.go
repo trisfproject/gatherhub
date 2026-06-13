@@ -262,10 +262,10 @@ func (h *PageHandler) CheckinSubmit(c *fiber.Ctx) error {
 	}
 
 	// 2. Attempt checking in
-	att, err := h.checkinService.Checkin(payload.ParticipantID, payload.EventID)
+	att, err := h.checkinService.Checkin(payload.ParticipantID, payload.EventID, "QR_CODE")
 	if err != nil {
 		var buf bytes.Buffer
-		if strings.Contains(err.Error(), "sudah melakukan check-in") {
+		if strings.Contains(err.Error(), "sudah melakukan check-in") || strings.Contains(err.Error(), "already checked in") {
 			// Fetch the existing attendance record to display who and when they checked in
 			existingAtt, getErr := h.checkinService.GetAttendance(payload.ParticipantID, payload.EventID)
 			if getErr == nil {

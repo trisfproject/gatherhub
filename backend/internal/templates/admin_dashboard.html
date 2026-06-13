@@ -108,6 +108,12 @@
       </svg>
       Backup & Restore
     </a>
+    <a href="/admin/checkin" class="nav-item">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+      </svg>
+      Check-In Manual
+    </a>
     {{if eq .AdminRole "SUPER_ADMIN"}}
     <a href="/admin/admins" class="nav-item">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -271,6 +277,48 @@
           <span class="text-3xl font-extrabold text-red-300">{{.Stats.Rejected}}</span>
         </div>
         <p class="text-xs text-white/40 font-semibold uppercase tracking-wider">Ditolak</p>
+      </div>
+    </div>
+
+    <!-- ── Check-in Stats Row ── -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 fade-up">
+      <!-- Total Verified (Verified + Checked-In) -->
+      <div class="stat-card border-emerald-500/20">
+        <div class="flex items-start justify-between mb-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+            <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <span class="text-3xl font-extrabold text-emerald-300">{{.Stats.VerifiedTotal}}</span>
+        </div>
+        <p class="text-xs text-white/40 font-semibold uppercase tracking-wider">Total Terverifikasi</p>
+      </div>
+
+      <!-- Total Checked-In -->
+      <div class="stat-card border-blue-500/20">
+        <div class="flex items-start justify-between mb-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+            <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+            </svg>
+          </div>
+          <span class="text-3xl font-extrabold text-blue-300">{{.Stats.CheckedIn}}</span>
+        </div>
+        <p class="text-xs text-white/40 font-semibold uppercase tracking-wider">Total Hadir (Checked-In)</p>
+      </div>
+
+      <!-- Attendance Rate -->
+      <div class="stat-card border-indigo-500/20">
+        <div class="flex items-start justify-between mb-3">
+          <div class="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
+            <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z"/>
+            </svg>
+          </div>
+          <span class="text-3xl font-extrabold text-indigo-300">{{printf "%.1f" .Stats.AttendanceRate}}%</span>
+        </div>
+        <p class="text-xs text-white/40 font-semibold uppercase tracking-wider">Tingkat Kehadiran</p>
       </div>
     </div>
 

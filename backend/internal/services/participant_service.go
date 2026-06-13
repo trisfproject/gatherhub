@@ -38,10 +38,13 @@ type RegisterForm struct {
 
 // ParticipantStats holds dashboard counts by status
 type ParticipantStats struct {
-	Total    int64
-	Pending  int64
-	Verified int64
-	Rejected int64
+	Total          int64
+	Pending        int64
+	Verified       int64
+	Rejected       int64
+	CheckedIn      int64
+	VerifiedTotal  int64
+	AttendanceRate float64
 }
 
 var emailRegex = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
@@ -188,8 +191,8 @@ func (s *ParticipantService) GetAllForAdmin(statusFilter, search string) ([]mode
 	if search != "" {
 		like := "%" + search + "%"
 		q = q.Where(
-			"full_name ILIKE ? OR email ILIKE ? OR company_name ILIKE ? OR registration_number ILIKE ?",
-			like, like, like, like,
+			"full_name ILIKE ? OR email ILIKE ? OR company_name ILIKE ? OR registration_number ILIKE ? OR phone ILIKE ?",
+			like, like, like, like, like,
 		)
 	}
 
@@ -213,8 +216,8 @@ func (s *ParticipantService) GetPaginatedForAdmin(statusFilter, search string, p
 	if search != "" {
 		like := "%" + search + "%"
 		q = q.Where(
-			"full_name ILIKE ? OR email ILIKE ? OR company_name ILIKE ? OR registration_number ILIKE ?",
-			like, like, like, like,
+			"full_name ILIKE ? OR email ILIKE ? OR company_name ILIKE ? OR registration_number ILIKE ? OR phone ILIKE ?",
+			like, like, like, like, like,
 		)
 	}
 
@@ -258,7 +261,14 @@ func (s *ParticipantService) GetStats() (*ParticipantStats, error) {
 			stats.Verified = r.Count
 		case models.StatusRejected:
 			stats.Rejected = r.Count
+		case models.StatusCheckedIn:
+			stats.CheckedIn = r.Count
 		}
+	}
+
+	stats.VerifiedTotal = stats.Verified + stats.CheckedIn
+	if stats.VerifiedTotal > 0 {
+		stats.AttendanceRate = float64(stats.CheckedIn) / float64(stats.VerifiedTotal) * 100.0
 	}
 
 	return stats, nil
@@ -365,7 +375,14 @@ func (s *ParticipantService) GetFilteredStats(eventID uint, startDate, endDate s
 			stats.Verified = r.Count
 		case models.StatusRejected:
 			stats.Rejected = r.Count
+		case models.StatusCheckedIn:
+			stats.CheckedIn = r.Count
 		}
+	}
+
+	stats.VerifiedTotal = stats.Verified + stats.CheckedIn
+	if stats.VerifiedTotal > 0 {
+		stats.AttendanceRate = float64(stats.CheckedIn) / float64(stats.VerifiedTotal) * 100.0
 	}
 
 	return stats, nil

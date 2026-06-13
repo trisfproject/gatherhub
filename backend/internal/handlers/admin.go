@@ -179,6 +179,16 @@ type AdminBackupsData struct {
 	FlashError   string
 }
 
+type AdminCheckinData struct {
+	AdminUser    string
+	AdminRole    string
+	Participants []models.Participant
+	Stats        *services.ParticipantStats
+	Search       string
+	FlashSuccess string
+	FlashError   string
+}
+
 // ─────────────────────── Handler ───────────────────────
 
 // AdminHandler handles all admin panel routes
@@ -235,6 +245,7 @@ func NewAdminHandler(
 		"admin_audit_logs.html",
 		"admin_participant_qr.html",
 		"admin_backups.html",
+		"admin_checkin.html",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse admin templates: %w", err)
@@ -2232,4 +2243,62 @@ func (h *AdminHandler) DeleteBackupSubmit(c *fiber.Ctx) error {
 
 	setFlash(c, "success", "Backup \""+cleaned+"\" berhasil dihapus.")
 	return c.Redirect("/admin/backups", fiber.StatusSeeOther)
+}
+
+// CheckinPage handles GET /admin/checkin
+func (h *AdminHandler) CheckinPage(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	search := strings.TrimSpace(c.Query("q"))
+
+	var participants []models.Participant
+	var err error
+
+	participants, err = h.participantService.GetAllForAdmin("", search)
+	if err != nil {
+		participants = []models.Participant{}
+	}
+
+	stats, _ := h.participantService.GetStats()
+
+	return h.render(c, "admin_checkin.html", AdminCheckinData{
+		AdminUser:    adminUser,
+		AdminRole:    adminRole,
+		Participants: participants,
+		Stats:        stats,
+		Search:       search,
+		FlashSuccess: getFlash(c, "success"),
+		FlashError:   getFlash(c, "error"),
+	})
+}
+
+// CheckinSubmit handles POST /admin/checkin/:participant_id
+func (h *AdminHandler) CheckinSubmit(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+
+	id, err := c.ParamsInt("participant_id")
+	if err != nil || id <= 0 {
+		setFlash(c, "error", "ID peserta tidak valid.")
+		return c.Redirect("/admin/checkin", fiber.StatusSeeOther)
+	}
+
+	p, err := h.participantService.GetByID(uint(id))
+	if err != nil {
+		setFlash(c, "error", "Peserta tidak ditemukan.")
+		return c.Redirect("/admin/checkin", fiber.StatusSeeOther)
+	}
+
+	_, err = h.checkinService.Checkin(p.ID, p.EventID, adminUser)
+	if err != nil {
+		setFlash(c, "error", err.Error())
+		return c.Redirect("/admin/checkin", fiber.StatusSeeOther)
+	}
+
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, "CHECKIN", "PARTICIPANT", p.ID, nil, map[string]string{"method": "manual"}, c.IP(), c.Get("User-Agent"))
+	}
+
+	setFlash(c, "success", "Peserta \""+p.FullName+"\" berhasil di-check in.")
+	return c.Redirect("/admin/checkin", fiber.StatusSeeOther)
 }
