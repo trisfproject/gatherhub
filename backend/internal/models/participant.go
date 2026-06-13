@@ -41,9 +41,16 @@ type Participant struct {
 	Status             ParticipantStatus `json:"status" gorm:"not null;default:PENDING;size:20;index;index:idx_event_status"`
 	VerifiedAt         *time.Time        `json:"verified_at,omitempty"`
 	RejectedAt         *time.Time        `json:"rejected_at,omitempty"`
+	DepartureZone      string            `json:"departure_zone" gorm:"size:255"`
+	DepartureZoneName  string            `json:"departure_zone_name" gorm:"size:255"`
+	DriverID           *uint             `json:"driver_id" gorm:"index"`
+	TransportMeetingPoint string         `json:"transport_meeting_point" gorm:"size:255"`
+	TransportDepartureTime string        `json:"transport_departure_time" gorm:"size:255"`
+	TransportNotes     string            `json:"transport_notes" gorm:"type:text"`
 	CreatedAt          time.Time         `json:"created_at" gorm:"index"`
 	UpdatedAt          time.Time         `json:"updated_at"`
 
 	// Associations
 	Event Event `json:"event,omitempty" gorm:"foreignKey:EventID"`
+	Driver *Participant `json:"driver,omitempty" gorm:"foreignKey:DriverID;references:ID"`
 }

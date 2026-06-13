@@ -31,6 +31,7 @@ type Event struct {
 	EnableVehicleInfo      bool      `json:"enable_vehicle_info" gorm:"not null;default:false"`
 	EnableCarpool          bool      `json:"enable_carpool" gorm:"not null;default:false"`
 	EnableTShirtSize       bool      `json:"enable_tshirt_size" gorm:"not null;default:false"`
+	EnableTransportationCoordination bool `json:"enable_transportation_coordination" gorm:"not null;default:false"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
 

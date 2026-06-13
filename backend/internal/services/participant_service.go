@@ -45,6 +45,8 @@ type RegisterForm struct {
 	CarpoolCanBring      string `form:"carpool_can_bring"`
 	CarpoolSeats         string `form:"carpool_seats"`
 	TShirtSize           string `form:"tshirt_size"`
+	DepartureZone        string `form:"departure_zone"`
+	DepartureZoneName    string `form:"departure_zone_name"`
 }
 
 // ParticipantStats holds dashboard counts by status
@@ -163,6 +165,37 @@ func (f *RegisterForm) Validate(event *models.Event) []string {
 		}
 	}
 
+	if event.EnableTransportationCoordination {
+		dz := strings.TrimSpace(f.DepartureZone)
+		if dz == "" {
+			errs = append(errs, "Zona Keberangkatan wajib dipilih")
+		} else if dz == "Other" {
+			if strings.TrimSpace(f.DepartureZoneName) == "" {
+				errs = append(errs, "Nama Zona Keberangkatan wajib diisi jika memilih Other")
+			}
+		}
+
+		if f.OwnVehicle != "true" && f.OwnVehicle != "false" {
+			errs = append(errs, "Status kepemilikan kendaraan wajib dipilih")
+		} else if f.OwnVehicle == "true" {
+			vt := strings.TrimSpace(f.VehicleType)
+			if vt != "Car" && vt != "Motorcycle" {
+				errs = append(errs, "Jenis Kendaraan wajib dipilih (Mobil atau Motor)")
+			}
+			if strings.TrimSpace(f.LicensePlate) == "" {
+				errs = append(errs, "Nomor Polisi (Plat Nomor) wajib diisi")
+			}
+			if f.CarpoolCanBring != "true" && f.CarpoolCanBring != "false" {
+				errs = append(errs, "Pertanyaan tawaran tumpangan wajib dijawab")
+			} else if f.CarpoolCanBring == "true" {
+				seats, err := strconv.Atoi(f.CarpoolSeats)
+				if err != nil || seats < 1 || seats > 4 {
+					errs = append(errs, "Jumlah Kursi Tersedia wajib dipilih antara 1 sampai 4")
+				}
+			}
+		}
+	}
+
 	return errs
 }
 
@@ -234,6 +267,8 @@ func (s *ParticipantService) Create(eventID uint, form *RegisterForm, paymentFil
 		TShirtSize:            strings.TrimSpace(form.TShirtSize),
 		PaymentProof:          paymentFilename,
 		Status:                models.StatusPending,
+		DepartureZone:         strings.TrimSpace(form.DepartureZone),
+		DepartureZoneName:     strings.TrimSpace(form.DepartureZoneName),
 	}
 
 	if strings.TrimSpace(form.JobTitle) != "" {
@@ -257,7 +292,7 @@ func (s *ParticipantService) Create(eventID uint, form *RegisterForm, paymentFil
 // GetByID returns a participant by ID, preloading the associated Event
 func (s *ParticipantService) GetByID(id uint) (*models.Participant, error) {
 	var p models.Participant
-	if err := s.db.Preload("Event").First(&p, id).Error; err != nil {
+	if err := s.db.Preload("Event").Preload("Driver").First(&p, id).Error; err != nil {
 		return nil, err
 	}
 	return &p, nil
@@ -629,4 +664,9 @@ func (s *ParticipantService) GetLatestVerifications(eventID uint, limit int) ([]
 	}
 	err := q.Preload("Event").Order("verified_at DESC").Limit(limit).Find(&participants).Error
 	return participants, err
+}
+
+// GetDB returns the database client instance
+func (s *ParticipantService) GetDB() *gorm.DB {
+	return s.db
 }

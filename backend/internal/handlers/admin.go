@@ -242,6 +242,7 @@ func NewAdminHandler(
 		"admin_broadcast_create.html",
 		"admin_broadcast_detail.html",
 		"admin_system.html",
+		"admin_transportation.html",
 		"admin_sidebar.html",
 	)
 	if err != nil {
@@ -858,6 +859,7 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 		"enable_vehicle_info":      c.FormValue("enable_vehicle_info"),
 		"enable_carpool":           c.FormValue("enable_carpool"),
 		"enable_tshirt_size":       c.FormValue("enable_tshirt_size"),
+		"enable_transportation_coordination": c.FormValue("enable_transportation_coordination"),
 	}
 
 	var errs []string
@@ -995,6 +997,7 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 		EnableVehicleInfo:      c.FormValue("enable_vehicle_info") == "true",
 		EnableCarpool:          c.FormValue("enable_carpool") == "true",
 		EnableTShirtSize:       c.FormValue("enable_tshirt_size") == "true",
+		EnableTransportationCoordination: c.FormValue("enable_transportation_coordination") == "true",
 	}
 
 	if err := h.eventService.Create(newEvent); err != nil {
@@ -1057,6 +1060,7 @@ func (h *AdminHandler) EventEditPage(c *fiber.Ctx) error {
 		"enable_vehicle_info":      strconv.FormatBool(event.EnableVehicleInfo),
 		"enable_carpool":           strconv.FormatBool(event.EnableCarpool),
 		"enable_tshirt_size":       strconv.FormatBool(event.EnableTShirtSize),
+		"enable_transportation_coordination": strconv.FormatBool(event.EnableTransportationCoordination),
 	}
 	if !event.RegistrationOpen.IsZero() {
 		formValues["registration_open"] = event.RegistrationOpen.Format("2006-01-02T15:04")
@@ -1140,6 +1144,7 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 		"enable_vehicle_info":      c.FormValue("enable_vehicle_info"),
 		"enable_carpool":           c.FormValue("enable_carpool"),
 		"enable_tshirt_size":       c.FormValue("enable_tshirt_size"),
+		"enable_transportation_coordination": c.FormValue("enable_transportation_coordination"),
 	}
 
 	var errs []string
@@ -1276,6 +1281,7 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 	event.EnableVehicleInfo = c.FormValue("enable_vehicle_info") == "true"
 	event.EnableCarpool = c.FormValue("enable_carpool") == "true"
 	event.EnableTShirtSize = c.FormValue("enable_tshirt_size") == "true"
+	event.EnableTransportationCoordination = c.FormValue("enable_transportation_coordination") == "true"
 
 	if err := h.eventService.Update(event); err != nil {
 		errs = append(errs, "Gagal memperbarui Acara: "+err.Error())
@@ -2862,6 +2868,12 @@ func BuildSidebarItems(role string, active string, stats *services.ParticipantSt
 			Active: active == "broadcasts",
 		},
 		{
+			Title:  "Koordinasi Transportasi",
+			URL:    "/admin/transportation",
+			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>`,
+			Active: active == "transportation",
+		},
+		{
 			Title:  "Kesehatan Sistem",
 			URL:    "/admin/system",
 			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>`,
@@ -2892,4 +2904,394 @@ func BuildSidebarItems(role string, active string, stats *services.ParticipantSt
 	})
 
 	return items
+}
+
+type DriverInfo struct {
+	models.Participant
+	Passengers    []models.Participant
+	OccupiedSeats int
+}
+
+type AdminTransportationData struct {
+	AdminBase
+	Event           *models.Event
+	Drivers         []DriverInfo
+	Passengers      []models.Participant
+	AllDrivers      []models.Participant
+	ZoneFilter      string
+	StatusFilter    string
+	SearchQuery     string
+	TotalSeats      int
+	OccupiedSeats   int
+	TotalDrivers    int
+	TotalPassengers int
+}
+
+// TransportationCoordination handles GET /admin/transportation
+func (h *AdminHandler) TransportationCoordination(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	event, err := h.eventService.GetFirst()
+	if err != nil || event == nil {
+		return h.render(c, "admin_transportation.html", fiber.Map{
+			"Error": "Acara tidak ditemukan",
+		})
+	}
+
+	// Fetch Stats for Sidebar
+	stats, _ := h.participantService.GetStats()
+
+	// Query Drivers (Verified and has vehicle and is a car/mobil and can bring others)
+	var driverParticipants []models.Participant
+	err = h.participantService.GetDB().
+		Where("event_id = ? AND status IN ('VERIFIED', 'CHECKED_IN') AND own_vehicle = ? AND (vehicle_type = ? OR vehicle_type = ?) AND carpool_can_bring = ?",
+			event.ID, true, "Car", "Mobil", true).
+		Order("full_name ASC").
+		Find(&driverParticipants).Error
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Gagal mengambil data pengemudi: " + err.Error())
+	}
+
+	var drivers []DriverInfo
+	for _, dp := range driverParticipants {
+		var passengers []models.Participant
+		h.participantService.GetDB().Where("driver_id = ?", dp.ID).Find(&passengers)
+		drivers = append(drivers, DriverInfo{
+			Participant:   dp,
+			Passengers:    passengers,
+			OccupiedSeats: len(passengers),
+		})
+	}
+
+	// Filters for Passengers Pool
+	zoneFilter := strings.TrimSpace(c.Query("zone"))
+	statusFilter := strings.TrimSpace(c.Query("status"))
+	searchQuery := strings.TrimSpace(c.Query("q"))
+
+	// Query Passengers (Verified/Checked-In, but not drivers)
+	qPassengers := h.participantService.GetDB().Preload("Driver").
+		Where("event_id = ? AND status IN ('VERIFIED', 'CHECKED_IN')", event.ID).
+		Where("NOT (own_vehicle = ? AND (vehicle_type = ? OR vehicle_type = ?) AND carpool_can_bring = ?)", true, "Car", "Mobil", true)
+
+	if zoneFilter != "" {
+		qPassengers = qPassengers.Where("departure_zone = ?", zoneFilter)
+	}
+	if statusFilter == "assigned" {
+		qPassengers = qPassengers.Where("driver_id IS NOT NULL")
+	} else if statusFilter == "unassigned" {
+		qPassengers = qPassengers.Where("driver_id IS NULL")
+	}
+	if searchQuery != "" {
+		like := "%" + searchQuery + "%"
+		qPassengers = qPassengers.Where("full_name ILIKE ? OR company_name ILIKE ? OR phone ILIKE ?", like, like, like)
+	}
+
+	var passengers []models.Participant
+	err = qPassengers.Order("full_name ASC").Find(&passengers).Error
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Gagal mengambil data penumpang: " + err.Error())
+	}
+
+	// Calculate counts
+	totalSeats := 0
+	occupiedSeats := 0
+	for _, dr := range drivers {
+		totalSeats += dr.CarpoolSeats
+		occupiedSeats += dr.OccupiedSeats
+	}
+
+	return h.render(c, "admin_transportation.html", AdminTransportationData{
+		AdminBase: AdminBase{
+			AdminUser:  adminUser,
+			AdminRole:  adminRole,
+			ActiveMenu: "transportation",
+			Stats:       stats,
+		},
+		Event:           event,
+		Drivers:         drivers,
+		Passengers:      passengers,
+		AllDrivers:      driverParticipants,
+		ZoneFilter:      zoneFilter,
+		StatusFilter:    statusFilter,
+		SearchQuery:     searchQuery,
+		TotalSeats:      totalSeats,
+		OccupiedSeats:   occupiedSeats,
+		TotalDrivers:    len(drivers),
+		TotalPassengers: len(passengers),
+	})
+}
+
+// AssignPassenger handles POST /admin/transportation/assign
+func (h *AdminHandler) AssignPassenger(c *fiber.Ctx) error {
+	passengerID, err := strconv.Atoi(c.FormValue("passenger_id"))
+	if err != nil || passengerID <= 0 {
+		return c.Status(fiber.StatusBadRequest).SendString("ID penumpang tidak valid")
+	}
+
+	driverID, err := strconv.Atoi(c.FormValue("driver_id"))
+	if err != nil || driverID <= 0 {
+		return c.Status(fiber.StatusBadRequest).SendString("ID pengemudi tidak valid")
+	}
+
+	// Fetch passenger
+	var passenger models.Participant
+	if err := h.participantService.GetDB().First(&passenger, passengerID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).SendString("Penumpang tidak ditemukan")
+	}
+
+	// Fetch driver
+	var driver models.Participant
+	if err := h.participantService.GetDB().First(&driver, driverID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).SendString("Pengemudi tidak ditemukan")
+	}
+
+	// Check if passenger is the driver
+	if passenger.ID == driver.ID {
+		return c.Status(fiber.StatusBadRequest).SendString("Tidak bisa menugaskan pengemudi ke dirinya sendiri")
+	}
+
+	// Check available seats
+	var currentPassengersCount int64
+	h.participantService.GetDB().Model(&models.Participant{}).Where("driver_id = ?", driver.ID).Count(&currentPassengersCount)
+
+	if int(currentPassengersCount) >= driver.CarpoolSeats {
+		return c.Status(fiber.StatusBadRequest).SendString("Jumlah kursi yang tersedia pada pengemudi ini sudah penuh")
+	}
+
+	// Assign
+	dID := uint(driverID)
+	passenger.DriverID = &dID
+	if err := h.participantService.GetDB().Save(&passenger).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Gagal menugaskan penumpang: " + err.Error())
+	}
+
+	// Log audit trail
+	adminUser, _ := c.Locals("admin_username").(string)
+	_ = h.auditLogService.Log(adminUser, "ASSIGN_PASSENGER", "PARTICIPANT", passenger.ID, nil, map[string]string{"driver_id": strconv.Itoa(int(driver.ID))}, c.IP(), c.Get("User-Agent"))
+
+	if c.Get("HX-Request") == "true" {
+		c.Set("HX-Refresh", "true")
+		return c.SendStatus(fiber.StatusOK)
+	}
+	return c.Redirect("/admin/transportation", fiber.StatusSeeOther)
+}
+
+// UnassignPassenger handles POST /admin/transportation/unassign
+func (h *AdminHandler) UnassignPassenger(c *fiber.Ctx) error {
+	passengerID, err := strconv.Atoi(c.FormValue("passenger_id"))
+	if err != nil || passengerID <= 0 {
+		return c.Status(fiber.StatusBadRequest).SendString("ID penumpang tidak valid")
+	}
+
+	// Fetch passenger
+	var passenger models.Participant
+	if err := h.participantService.GetDB().First(&passenger, passengerID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).SendString("Penumpang tidak ditemukan")
+	}
+
+	passenger.DriverID = nil
+	if err := h.participantService.GetDB().Save(&passenger).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Gagal melepas penumpang: " + err.Error())
+	}
+
+	// Log audit trail
+	adminUser, _ := c.Locals("admin_username").(string)
+	_ = h.auditLogService.Log(adminUser, "UNASSIGN_PASSENGER", "PARTICIPANT", passenger.ID, nil, nil, c.IP(), c.Get("User-Agent"))
+
+	if c.Get("HX-Request") == "true" {
+		c.Set("HX-Refresh", "true")
+		return c.SendStatus(fiber.StatusOK)
+	}
+	return c.Redirect("/admin/transportation", fiber.StatusSeeOther)
+}
+
+// UpdateDriverDetails handles POST /admin/transportation/driver-details
+func (h *AdminHandler) UpdateDriverDetails(c *fiber.Ctx) error {
+	driverID, err := strconv.Atoi(c.FormValue("driver_id"))
+	if err != nil || driverID <= 0 {
+		return c.Status(fiber.StatusBadRequest).SendString("ID pengemudi tidak valid")
+	}
+
+	meetingPoint := strings.TrimSpace(c.FormValue("meeting_point"))
+	departureTime := strings.TrimSpace(c.FormValue("departure_time"))
+	notes := strings.TrimSpace(c.FormValue("notes"))
+
+	// Fetch driver
+	var driver models.Participant
+	if err := h.participantService.GetDB().First(&driver, driverID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).SendString("Pengemudi tidak ditemukan")
+	}
+
+	driver.TransportMeetingPoint = meetingPoint
+	driver.TransportDepartureTime = departureTime
+	driver.TransportNotes = notes
+
+	if err := h.participantService.GetDB().Save(&driver).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Gagal menyimpan detail keberangkatan: " + err.Error())
+	}
+
+	// Log audit trail
+	adminUser, _ := c.Locals("admin_username").(string)
+	_ = h.auditLogService.Log(adminUser, "UPDATE_DRIVER_DETAILS", "PARTICIPANT", driver.ID, nil, map[string]string{"meeting_point": meetingPoint, "departure_time": departureTime, "notes": notes}, c.IP(), c.Get("User-Agent"))
+
+	if c.Get("HX-Request") == "true" {
+		c.Set("HX-Refresh", "true")
+		return c.SendStatus(fiber.StatusOK)
+	}
+	return c.Redirect("/admin/transportation", fiber.StatusSeeOther)
+}
+
+// ExportTransportation handles GET /admin/transportation/export
+func (h *AdminHandler) ExportTransportation(c *fiber.Ctx) error {
+	event, err := h.eventService.GetFirst()
+	if err != nil || event == nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Acara tidak ditemukan")
+	}
+
+	// Fetch all verified/checked-in participants for this event
+	var participants []models.Participant
+	err = h.participantService.GetDB().Preload("Driver").
+		Where("event_id = ? AND status IN ('VERIFIED', 'CHECKED_IN')", event.ID).
+		Order("full_name ASC").
+		Find(&participants).Error
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Gagal mengambil data peserta")
+	}
+
+	// Build XLSX
+	f := excelize.NewFile()
+	defer f.Close()
+
+	sheet := "Transportasi"
+	f.SetSheetName("Sheet1", sheet)
+
+	// Style header
+	headerStyle, _ := f.NewStyle(&excelize.Style{
+		Font:      &excelize.Font{Bold: true, Color: "FFFFFF", Size: 11},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{"4F46E5"}, Pattern: 1},
+		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true},
+		Border: []excelize.Border{
+			{Type: "left", Color: "CCCCCC", Style: 1},
+			{Type: "right", Color: "CCCCCC", Style: 1},
+			{Type: "top", Color: "CCCCCC", Style: 1},
+			{Type: "bottom", Color: "CCCCCC", Style: 1},
+		},
+	})
+
+	dataStyle, _ := f.NewStyle(&excelize.Style{
+		Font:      &excelize.Font{Size: 10},
+		Alignment: &excelize.Alignment{Vertical: "center", WrapText: false},
+		Border: []excelize.Border{
+			{Type: "left", Color: "E5E7EB", Style: 1},
+			{Type: "right", Color: "E5E7EB", Style: 1},
+			{Type: "bottom", Color: "E5E7EB", Style: 1},
+		},
+	})
+
+	colNumToName := func(col int) string {
+		name := ""
+		for col > 0 {
+			col--
+			name = string(rune('A'+col%26)) + name
+			col /= 26
+		}
+		return name
+	}
+
+	type colDef struct {
+		label string
+		width float64
+		value func(p *models.Participant) string
+	}
+
+	cols := []colDef{
+		{"Participant", 24, func(p *models.Participant) string { return p.FullName }},
+		{"WhatsApp", 18, func(p *models.Participant) string { return p.Phone }},
+		{"Departure Zone", 24, func(p *models.Participant) string {
+			if p.DepartureZone == "Other" {
+				return fmt.Sprintf("Other (%s)", p.DepartureZoneName)
+			}
+			return p.DepartureZone
+		}},
+		{"Driver", 24, func(p *models.Participant) string {
+			if p.OwnVehicle && p.VehicleType == "Car" && p.CarpoolCanBring {
+				return "Self (Driver)"
+			}
+			if p.DriverID != nil && p.Driver != nil {
+				return p.Driver.FullName
+			}
+			return "–"
+		}},
+		{"Driver Phone", 18, func(p *models.Participant) string {
+			if p.OwnVehicle && p.VehicleType == "Car" && p.CarpoolCanBring {
+				return p.Phone
+			}
+			if p.DriverID != nil && p.Driver != nil {
+				return p.Driver.Phone
+			}
+			return "–"
+		}},
+		{"Vehicle Plate", 16, func(p *models.Participant) string {
+			if p.OwnVehicle && p.VehicleType == "Car" && p.CarpoolCanBring {
+				return p.LicensePlate
+			}
+			if p.DriverID != nil && p.Driver != nil {
+				return p.Driver.LicensePlate
+			}
+			return "–"
+		}},
+		{"Meeting Point", 24, func(p *models.Participant) string {
+			if p.OwnVehicle && p.VehicleType == "Car" && p.CarpoolCanBring {
+				return p.TransportMeetingPoint
+			}
+			if p.DriverID != nil && p.Driver != nil {
+				return p.Driver.TransportMeetingPoint
+			}
+			return "–"
+		}},
+		{"Departure Time", 18, func(p *models.Participant) string {
+			if p.OwnVehicle && p.VehicleType == "Car" && p.CarpoolCanBring {
+				return p.TransportDepartureTime
+			}
+			if p.DriverID != nil && p.Driver != nil {
+				return p.Driver.TransportDepartureTime
+			}
+			return "–"
+		}},
+	}
+
+	// Write Headers
+	for ci, col := range cols {
+		colLetter := colNumToName(ci + 1)
+		cell := colLetter + "1"
+		f.SetCellValue(sheet, cell, col.label)
+		f.SetCellStyle(sheet, cell, cell, headerStyle)
+		f.SetColWidth(sheet, colLetter, colLetter, col.width)
+	}
+	f.SetRowHeight(sheet, 1, 22)
+
+	// Write Data
+	for ri, p := range participants {
+		row := ri + 2
+		rowStr := strconv.Itoa(row)
+		for ci, col := range cols {
+			colLetter := colNumToName(ci + 1)
+			cell := colLetter + rowStr
+			f.SetCellValue(sheet, cell, col.value(&p))
+			f.SetCellStyle(sheet, cell, cell, dataStyle)
+		}
+		f.SetRowHeight(sheet, row, 20)
+	}
+
+	// Stream file to response
+	c.Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	filename := fmt.Sprintf("transport-coordination-%s.xlsx", event.Slug)
+	c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+
+	if err := f.Write(c.Response().BodyWriter()); err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Gagal menulis file spreadsheet")
+	}
+
+	return nil
 }

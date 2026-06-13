@@ -134,6 +134,13 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	// System health
 	admin.Get("/system", adminHandler.SystemHealth)
 
+	// Transportation coordination
+	admin.Get("/transportation", adminHandler.TransportationCoordination)
+	admin.Post("/transportation/assign", adminHandler.AssignPassenger)
+	admin.Post("/transportation/unassign", adminHandler.UnassignPassenger)
+	admin.Post("/transportation/driver-details", adminHandler.UpdateDriverDetails)
+	admin.Get("/transportation/export", adminHandler.ExportTransportation)
+
 	// Admin management & settings (SUPER_ADMIN only)
 	superAdmin := admin.Group("/", middleware.RequireRole(store, "SUPER_ADMIN"))
 	superAdmin.Get("/admins", adminHandler.AdminList)

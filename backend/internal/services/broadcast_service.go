@@ -27,7 +27,7 @@ func NewBroadcastService(db *gorm.DB, notificationService *NotificationService, 
 
 // GetRecipientsQuery formulates the query based on selected group and filters
 func (s *BroadcastService) GetRecipientsQuery(eventID uint, group string, city, industrialEstate, companyName string) *gorm.DB {
-	q := s.db.Model(&models.Participant{}).Preload("Event")
+	q := s.db.Model(&models.Participant{}).Preload("Event").Preload("Driver")
 
 	if eventID > 0 {
 		q = q.Where("participants.event_id = ?", eventID)
@@ -101,6 +101,38 @@ func (s *BroadcastService) RenderTemplate(msgTmpl string, p *models.Participant)
 	res = strings.ReplaceAll(res, "{{participant_name}}", p.FullName)
 	res = strings.ReplaceAll(res, "{{registration_number}}", p.RegistrationNumber)
 	res = strings.ReplaceAll(res, "{{event_title}}", p.Event.Title)
+
+	var driverName, vehiclePlate, meetingPoint, departureTime string
+	if p.OwnVehicle && p.VehicleType == "Car" && p.CarpoolCanBring {
+		driverName = p.FullName
+		vehiclePlate = p.LicensePlate
+		meetingPoint = p.TransportMeetingPoint
+		departureTime = p.TransportDepartureTime
+	} else if p.DriverID != nil && p.Driver != nil {
+		driverName = p.Driver.FullName
+		vehiclePlate = p.Driver.LicensePlate
+		meetingPoint = p.Driver.TransportMeetingPoint
+		departureTime = p.Driver.TransportDepartureTime
+	}
+
+	if driverName == "" {
+		driverName = "–"
+	}
+	if vehiclePlate == "" {
+		vehiclePlate = "–"
+	}
+	if meetingPoint == "" {
+		meetingPoint = "–"
+	}
+	if departureTime == "" {
+		departureTime = "–"
+	}
+
+	res = strings.ReplaceAll(res, "{{driver_name}}", driverName)
+	res = strings.ReplaceAll(res, "{{vehicle_plate}}", vehiclePlate)
+	res = strings.ReplaceAll(res, "{{meeting_point}}", meetingPoint)
+	res = strings.ReplaceAll(res, "{{departure_time}}", departureTime)
+
 	return res
 }
 
