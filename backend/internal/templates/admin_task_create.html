@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Tambah Tugas Persiapan Baru — GatherHub Admin</title>
+  <title>Tambah Tugas — GatherHub Admin</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
@@ -41,8 +41,13 @@
         </svg>
       </a>
       <div>
-        <h2 class="text-base font-bold text-white">Tambah Tugas Baru</h2>
-        <p class="text-xs text-white/30">Daftarkan rencana pekerjaan persiapan untuk kelancaran acara</p>
+        <div class="text-[10px] text-white/40 mb-0.5 flex items-center gap-1.5 font-bold uppercase tracking-wider">
+          <a href="/admin/tasks" class="hover:text-indigo-400 transition-colors">Persiapan Acara</a>
+          <svg class="w-3 h-3 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+          <span class="text-indigo-300">Tambah Tugas</span>
+        </div>
+        <h2 class="text-base font-bold text-white">Tambah Tugas</h2>
+        <p class="text-xs text-white/30">Buat tugas baru untuk persiapan acara</p>
       </div>
     </div>
     <div class="flex items-center gap-3">
@@ -52,7 +57,7 @@
     </div>
   </div>
 
-  <div class="p-6 max-w-2xl">
+  <div class="p-6 max-w-5xl">
     <!-- Errors Alert -->
     {{if .Errors}}
     <div class="bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl p-4 mb-6 flex gap-3 fade-up">
@@ -74,82 +79,87 @@
       <div class="glass p-6">
         <h3 class="text-indigo-300 font-bold text-sm uppercase tracking-wider mb-5 pb-2 border-b border-white/5">Detail Tugas Persiapan</h3>
 
-        <div class="flex flex-col gap-4">
-          <!-- Event Selection -->
-          <div class="form-group">
-            <label class="form-label">Pilih Acara *</label>
-            <select name="event_id" class="form-input bg-indigo-950/40 text-white" required id="task_event_id">
-              <option value="" class="bg-indigo-950 text-white/50">-- Pilih Acara --</option>
-              {{range .Events}}
-                <option value="{{.ID}}" class="bg-indigo-950 text-white" {{if eq (index $.Form "event_id") (printf "%d" .ID)}}selected{{end}}>{{.Title}}</option>
-              {{end}}
-            </select>
-          </div>
-
-          <!-- Title -->
-          <div class="form-group">
-            <label class="form-label">Judul Tugas *</label>
-            <input type="text" name="title" value='{{index .Form "title"}}' placeholder="Contoh: Menyiapkan desain merchandise" class="form-input" required id="task_title"/>
-          </div>
-
-          <!-- Description -->
-          <div class="form-group">
-            <label class="form-label">Deskripsi Tugas</label>
-            <textarea name="description" placeholder="Jelaskan rincian tugas ini..." class="form-input min-h-[100px] resize-y" id="task_description">{{index .Form "description"}}</textarea>
-          </div>
-
-          <!-- Category -->
-          <div class="form-group">
-            <label class="form-label">Kategori *</label>
-            <select name="category" class="form-input bg-indigo-950/40 text-white" required id="task_category">
-              <option value="" class="bg-indigo-950 text-white/50">-- Pilih Kategori --</option>
-              <option value="Registration" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Registration"}}selected{{end}}>Pendaftaran (Registration)</option>
-              <option value="Transportation" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Transportation"}}selected{{end}}>Transportasi (Transportation)</option>
-              <option value="Merchandise" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Merchandise"}}selected{{end}}>Merchandise</option>
-              <option value="Sponsor" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Sponsor"}}selected{{end}}>Sponsor / Partner</option>
-              <option value="Venue" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Venue"}}selected{{end}}>Lokasi / Venue</option>
-              <option value="Broadcast" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Broadcast"}}selected{{end}}>Siaran / Broadcast</option>
-              <option value="Logistics" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Logistics"}}selected{{end}}>Logistik</option>
-              <option value="Other" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Other"}}selected{{end}}>Lainnya (Other)</option>
-            </select>
-          </div>
-
-          <!-- Priority & Status -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+          <!-- Left Column -->
+          <div>
+            <!-- Event Selection -->
             <div class="form-group">
-              <label class="form-label">Prioritas *</label>
-              <select name="priority" class="form-input bg-indigo-950/40 text-white" required id="task_priority">
-                <option value="Low" class="bg-indigo-950 text-white" {{if eq (index .Form "priority") "Low"}}selected{{end}}>Low (Rendah)</option>
-                <option value="Medium" class="bg-indigo-950 text-white" {{if eq (index .Form "priority") "Medium"}}selected{{end}}>Medium (Sedang)</option>
-                <option value="High" class="bg-indigo-950 text-white" {{if eq (index .Form "priority") "High"}}selected{{end}}>High (Tinggi)</option>
-                <option value="Critical" class="bg-indigo-950 text-white" {{if eq (index .Form "priority") "Critical"}}selected{{end}}>Critical (Kritis)</option>
+              <label class="form-label">Pilih Acara *</label>
+              <select name="event_id" class="form-input bg-indigo-950/40 text-white w-full" required id="task_event_id">
+                <option value="" class="bg-indigo-950 text-white/50">-- Pilih Acara --</option>
+                {{range .Events}}
+                  <option value="{{.ID}}" class="bg-indigo-950 text-white" {{if eq (index $.Form "event_id") (printf "%d" .ID)}}selected{{end}}>{{.Title}}</option>
+                {{end}}
               </select>
             </div>
 
+            <!-- Title -->
             <div class="form-group">
-              <label class="form-label">Status *</label>
-              <select name="status" class="form-input bg-indigo-950/40 text-white" required id="task_status">
-                <option value="Todo" class="bg-indigo-950 text-white" {{if eq (index .Form "status") "Todo"}}selected{{end}}>Todo</option>
-                <option value="In Progress" class="bg-indigo-950 text-white" {{if eq (index .Form "status") "In Progress"}}selected{{end}}>In Progress</option>
-                <option value="Done" class="bg-indigo-950 text-white" {{if eq (index .Form "status") "Done"}}selected{{end}}>Done</option>
-                <option value="Cancelled" class="bg-indigo-950 text-white" {{if eq (index .Form "status") "Cancelled"}}selected{{end}}>Cancelled</option>
+              <label class="form-label">Judul Tugas *</label>
+              <input type="text" name="title" value='{{index .Form "title"}}' placeholder="Contoh: Menyiapkan desain merchandise" class="form-input w-full" required id="task_title"/>
+            </div>
+
+            <!-- Description -->
+            <div class="form-group">
+              <label class="form-label">Deskripsi Tugas</label>
+              <textarea name="description" placeholder="Jelaskan rincian tugas ini..." class="form-input w-full min-h-[148px] resize-y" id="task_description">{{index .Form "description"}}</textarea>
+            </div>
+          </div>
+
+          <!-- Right Column -->
+          <div>
+            <!-- Category -->
+            <div class="form-group">
+              <label class="form-label">Kategori *</label>
+              <select name="category" class="form-input bg-indigo-950/40 text-white w-full" required id="task_category">
+                <option value="" class="bg-indigo-950 text-white/50">-- Pilih Kategori --</option>
+                <option value="Registration" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Registration"}}selected{{end}}>Pendaftaran (Registration)</option>
+                <option value="Transportation" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Transportation"}}selected{{end}}>Transportasi (Transportation)</option>
+                <option value="Merchandise" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Merchandise"}}selected{{end}}>Merchandise</option>
+                <option value="Sponsor" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Sponsor"}}selected{{end}}>Sponsor / Partner</option>
+                <option value="Venue" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Venue"}}selected{{end}}>Lokasi / Venue</option>
+                <option value="Broadcast" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Broadcast"}}selected{{end}}>Siaran / Broadcast</option>
+                <option value="Logistics" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Logistics"}}selected{{end}}>Logistik</option>
+                <option value="Other" class="bg-indigo-950 text-white" {{if eq (index .Form "category") "Other"}}selected{{end}}>Lainnya (Other)</option>
               </select>
             </div>
-          </div>
 
-          <!-- Due Date & Assigned To -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="form-group">
-              <label class="form-label">Jatuh Tempo (Due Date) *</label>
-              <input type="date" name="due_date" value='{{index .Form "due_date"}}' class="form-input" required id="task_due_date"/>
+            <!-- Priority & Status -->
+            <div class="grid grid-cols-2 gap-4">
+              <div class="form-group">
+                <label class="form-label">Prioritas *</label>
+                <select name="priority" class="form-input bg-indigo-950/40 text-white w-full" required id="task_priority">
+                  <option value="Low" class="bg-indigo-950 text-white" {{if eq (index .Form "priority") "Low"}}selected{{end}}>Low (Rendah)</option>
+                  <option value="Medium" class="bg-indigo-950 text-white" {{if eq (index .Form "priority") "Medium"}}selected{{end}}>Medium (Sedang)</option>
+                  <option value="High" class="bg-indigo-950 text-white" {{if eq (index .Form "priority") "High"}}selected{{end}}>High (Tinggi)</option>
+                  <option value="Critical" class="bg-indigo-950 text-white" {{if eq (index .Form "priority") "Critical"}}selected{{end}}>Critical (Kritis)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Status *</label>
+                <select name="status" class="form-input bg-indigo-950/40 text-white w-full" required id="task_status">
+                  <option value="Todo" class="bg-indigo-950 text-white" {{if eq (index .Form "status") "Todo"}}selected{{end}}>Todo</option>
+                  <option value="In Progress" class="bg-indigo-950 text-white" {{if eq (index .Form "status") "In Progress"}}selected{{end}}>In Progress</option>
+                  <option value="Done" class="bg-indigo-950 text-white" {{if eq (index .Form "status") "Done"}}selected{{end}}>Done</option>
+                  <option value="Cancelled" class="bg-indigo-950 text-white" {{if eq (index .Form "status") "Cancelled"}}selected{{end}}>Cancelled</option>
+                </select>
+              </div>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">Ditugaskan Kepada (Assigned To)</label>
-              <input type="text" name="assigned_to" value='{{index .Form "assigned_to"}}' placeholder="Nama penanggung jawab" class="form-input" id="task_assigned_to"/>
+            <!-- Due Date & Assigned To -->
+            <div class="grid grid-cols-2 gap-4">
+              <div class="form-group">
+                <label class="form-label">Jatuh Tempo *</label>
+                <input type="date" name="due_date" value='{{index .Form "due_date"}}' class="form-input w-full" required id="task_due_date"/>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Ditugaskan Kepada</label>
+                <input type="text" name="assigned_to" value='{{index .Form "assigned_to"}}' placeholder="Nama penanggung jawab" class="form-input w-full" id="task_assigned_to"/>
+              </div>
             </div>
           </div>
-
         </div>
       </div>
 
