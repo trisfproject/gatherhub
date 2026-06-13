@@ -171,7 +171,7 @@
                 {{$status := .Participant.Status | printf "%s"}}
                 {{$id := .Participant.ID}}
                 {{$name := .Participant.FullName}}
-                 {{if isEq $status "PENDING"}}
+                {{if isEq $status "PENDING"}}
                 <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'VERIFIED', 'Apakah Anda yakin ingin memverifikasi pendaftaran {{$name}} untuk {{if $.Event}}{{$.Event.Title}}{{else}}acara ini{{end}}?', 'VERIFIED')"
                   class="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
@@ -182,6 +182,12 @@
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                   Tolak
                 </button>
+                {{else if isEq $status "VERIFIED"}}
+                <a href="/admin/participants/{{$id}}/qr"
+                  class="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  Tampilkan QR Code
+                </a>
                 {{end}}
               </div>
             </div>

@@ -13,9 +13,10 @@ import (
 
 // Register sets up all application routes.
 // storage holds the resolved paths for all upload directories.
-func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageService, adminUsername, adminPassword string, store *session.Store) {
+func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageService, adminUsername, adminPassword string, store *session.Store, sessionSecret string) {
 	// ── Services ──────────────────────────────────────────────
 	auditLogService := services.NewAuditLogService(db)
+	checkinService := services.NewCheckinService(db, sessionSecret)
 	eventService := services.NewEventService(db)
 	participantService := services.NewParticipantService(db, storageService)
 	notificationService := services.NewNotificationService(db, auditLogService)
@@ -28,12 +29,12 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	// ── Handlers ──────────────────────────────────────────────
 	healthHandler := handlers.NewHealthHandler(db)
 
-	pageHandler, err := handlers.NewPageHandler(eventService, participantService, notificationService)
+	pageHandler, err := handlers.NewPageHandler(eventService, participantService, notificationService, checkinService)
 	if err != nil {
 		log.Fatalf("Failed to initialise page handler: %v", err)
 	}
 
-	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storageService, notificationService, auditLogService)
+	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storageService, notificationService, auditLogService, checkinService)
 	if err != nil {
 		log.Fatalf("Failed to initialise admin handler: %v", err)
 	}
@@ -44,6 +45,8 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	app.Post("/register", pageHandler.RegisterSubmit)
 	app.Get("/register/success", pageHandler.Success)
 	app.Get("/event/:slug", pageHandler.EventBySlug)
+	app.Get("/checkin", pageHandler.CheckinPage)
+	app.Post("/checkin", pageHandler.CheckinSubmit)
 
 	// ── Infrastructure ────────────────────────────────────────
 	app.Get("/health", healthHandler.Health)
@@ -71,6 +74,7 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	admin.Get("/participants/export", adminHandler.ExportParticipants)
 	admin.Get("/participants/:id", adminHandler.ParticipantDetail)
 	admin.Post("/participants/:id/status", adminHandler.UpdateStatus)
+	admin.Get("/participants/:id/qr", adminHandler.ParticipantQRPage)
 	admin.Get("/notifications", adminHandler.NotificationList)
 	admin.Get("/audit-logs", adminHandler.AuditLogList)
 

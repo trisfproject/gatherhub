@@ -172,6 +172,7 @@ type AdminHandler struct {
 	storageService      *services.StorageService
 	notificationService *services.NotificationService
 	auditLogService     *services.AuditLogService
+	checkinService      *services.CheckinService
 	tmpl                *template.Template
 }
 
@@ -184,6 +185,7 @@ func NewAdminHandler(
 	storageService *services.StorageService,
 	notificationService *services.NotificationService,
 	auditLogService *services.AuditLogService,
+	checkinService *services.CheckinService,
 ) (*AdminHandler, error) {
 	funcMap := buildAdminFuncMap()
 	t, err := template.New("").Funcs(funcMap).ParseFS(
@@ -202,6 +204,7 @@ func NewAdminHandler(
 		"admin_settings.html",
 		"admin_notifications.html",
 		"admin_audit_logs.html",
+		"admin_participant_qr.html",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse admin templates: %w", err)
@@ -214,6 +217,7 @@ func NewAdminHandler(
 		storageService:      storageService,
 		notificationService: notificationService,
 		auditLogService:     auditLogService,
+		checkinService:      checkinService,
 		tmpl:                t,
 	}, nil
 }
@@ -1311,7 +1315,12 @@ func buildStatusFragment(p *models.Participant) string {
   Tolak
 </button>`, p.ID, p.FullName, eventTitle, p.ID, p.FullName, eventTitle)
 	case models.StatusVerified:
-		actions = ""
+		actions = fmt.Sprintf(`
+<a href="/admin/participants/%d/qr"
+  class="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
+  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+  Tampilkan QR Code
+</a>`, p.ID)
 	case models.StatusRejected:
 		actions = ""
 	}
@@ -1900,5 +1909,51 @@ func (h *AdminHandler) AuditLogList(c *fiber.Ctx) error {
 		FilterAction:   actionFilter,
 		StartDate:      startDate,
 		EndDate:        endDate,
+	})
+}
+
+type AdminParticipantQRData struct {
+	AdminUser   string
+	AdminRole   string
+	Participant *models.Participant
+	Event       *models.Event
+	QRToken     string
+	Stats       *services.ParticipantStats
+}
+
+// ParticipantQRPage handles GET /admin/participants/:id/qr
+func (h *AdminHandler) ParticipantQRPage(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		return c.Redirect("/admin/participants", fiber.StatusSeeOther)
+	}
+
+	participant, err := h.participantService.GetByID(uint(id))
+	if err != nil {
+		return c.Redirect("/admin/participants", fiber.StatusSeeOther)
+	}
+
+	if participant.Status != models.StatusVerified {
+		setFlash(c, "error", "Hanya peserta VERIFIED yang dapat memiliki QR Code.")
+		return c.Redirect(fmt.Sprintf("/admin/participants/%d", id), fiber.StatusSeeOther)
+	}
+
+	token, err := h.checkinService.GenerateQRToken(participant.ID, participant.EventID, participant.RegistrationNumber)
+	if err != nil {
+		setFlash(c, "error", "Gagal membuat token QR: "+err.Error())
+		return c.Redirect(fmt.Sprintf("/admin/participants/%d", id), fiber.StatusSeeOther)
+	}
+
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+	stats, _ := h.participantService.GetStats()
+
+	return h.render(c, "admin_participant_qr.html", AdminParticipantQRData{
+		AdminUser:   adminUser,
+		AdminRole:   adminRole,
+		Participant: participant,
+		Event:       &participant.Event,
+		QRToken:     token,
+		Stats:       stats,
 	})
 }

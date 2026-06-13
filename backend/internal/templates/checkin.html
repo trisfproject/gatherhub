@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Check-in Acara — {{.Event.Title}}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background: #07071a; color: #fff; min-height: 100vh; }
+    .bg-hero { background: linear-gradient(135deg, #0d0d2b 0%, #1a1040 40%, #0d1635 100%); }
+    .bg-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    .btn-cta { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); box-shadow: 0 8px 32px rgba(99, 102, 241, 0.25); transition: all .25s ease; }
+    .btn-cta:hover { transform: translateY(-2px); box-shadow: 0 12px 36px rgba(99, 102, 241, 0.4); }
+    .btn-secondary { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12); transition: all .2s; }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.15); }
+    
+    /* QR Scanner custom scanner styling overlay */
+    #reader { border: none !important; width: 100% !important; overflow: hidden; border-radius: 16px; }
+    #reader video { border-radius: 16px; object-fit: cover; }
+    
+    @keyframes scan {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(100%); }
+    }
+    .scan-line { height: 3px; background: linear-gradient(90deg, transparent, #6366f1, transparent); animation: scan 2.5s linear infinite; }
+  </style>
+</head>
+<body class="bg-hero min-h-screen pb-12">
+
+  <!-- Header / Nav -->
+  <header class="w-full border-b border-white/5 bg-[#07071a]/80 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+          <svg class="w-4.5 h-4.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 00-1 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+          </svg>
+        </div>
+        <span class="font-bold text-base tracking-tight text-white">Check-in Portal</span>
+      </div>
+      <div class="text-xs font-semibold px-3 py-1 bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 rounded-full truncate max-w-[180px]">
+        {{.Event.Title}}
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-md mx-auto px-4 mt-6">
+    <!-- QR Scanner View Container -->
+    <div id="scanner-container" class="bg-card rounded-3xl p-4 mb-6 shadow-xl relative overflow-hidden">
+      <!-- Glow effect -->
+      <div class="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+      
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold text-white/80 flex items-center gap-2">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          Kamera Live Scanner
+        </h3>
+        <button id="toggle-camera-btn" onclick="toggleScanner()" class="text-xs text-indigo-300 hover:text-indigo-200 font-medium transition-colors">
+          Matikan Kamera
+        </button>
+      </div>
+
+      <!-- Live WebCam Reader frame -->
+      <div class="relative w-full aspect-square bg-black/40 border border-white/10 rounded-2xl overflow-hidden mb-3">
+        <!-- Scan line overlay -->
+        <div id="scan-line" class="scan-line absolute top-0 inset-x-0 z-10 pointer-events-none"></div>
+        <div id="reader" class="w-full h-full"></div>
+      </div>
+      
+      <p id="scanner-info" class="text-center text-xs text-white/40">
+        Posisikan kode QR peserta di dalam kotak kamera.
+      </p>
+    </div>
+
+    <!-- Scanner Result Target (HTMX returns success/failure cards here) -->
+    <div id="checkin-result" class="mb-6"></div>
+
+    <!-- Manual Entry Section -->
+    <div class="bg-card rounded-3xl p-5 shadow-xl relative overflow-hidden">
+      <h3 class="text-sm font-semibold text-white/80 mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+        Input Kode Manual
+      </h3>
+      <p class="text-xs text-white/40 mb-4">
+        Gunakan kolom di bawah jika kamera mengalami kendala atau tidak diizinkan.
+      </p>
+
+      <!-- HTMX checkin submission form -->
+      <form id="checkin-form" 
+            hx-post="/checkin" 
+            hx-target="#checkin-result"
+            hx-swap="innerHTML"
+            hx-indicator="#submit-indicator"
+            class="space-y-4">
+        <div>
+          <label for="token-input" class="sr-only">Token QR</label>
+          <div class="relative rounded-xl shadow-sm">
+            <input type="text" 
+                   name="token" 
+                   id="token-input" 
+                   class="block w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white placeholder-white/30 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-mono transition-colors" 
+                   placeholder="Masukkan kode payload QR..."
+                   required />
+          </div>
+        </div>
+
+        <button type="submit" class="w-full btn-cta text-white font-semibold py-3 px-4 rounded-xl text-sm flex items-center justify-center gap-2">
+          <span>Check-in Peserta</span>
+          <svg id="submit-indicator" class="animate-spin h-4 w-4 text-white hidden" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </button>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    let html5QrCode;
+    let isScanning = false;
+    const toggleBtn = document.getElementById("toggle-camera-btn");
+    const infoText = document.getElementById("scanner-info");
+    const scanLine = document.getElementById("scan-line");
+
+    document.addEventListener("DOMContentLoaded", () => {
+      startScanner();
+      
+      // Clear manual input on HTMX success checks
+      document.body.addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.target.id === 'checkin-result') {
+          if (evt.detail.successful) {
+            // clear form
+            document.getElementById("token-input").value = "";
+          }
+        }
+      });
+    });
+
+    function startScanner() {
+      if (isScanning) return;
+      
+      html5QrCode = new Html5Qrcode("reader");
+      
+      const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+        // Play scan beep sound (synthesized using AudioContext)
+        playBeep();
+        
+        // Put token into manual field
+        const input = document.getElementById("token-input");
+        input.value = decodedText;
+        
+        // Submit form via HTMX
+        htmx.trigger("#checkin-form", "submit");
+      };
+
+      const config = { 
+        fps: 15, 
+        qrbox: function(width, height) {
+          const minDim = Math.min(width, height);
+          return {
+            width: Math.floor(minDim * 0.7),
+            height: Math.floor(minDim * 0.7)
+          };
+        },
+        aspectRatio: 1.0
+      };
+
+      Html5Qrcode.getCameras().then(devices => {
+        if (devices && devices.length) {
+          let cameraId = devices[0].id;
+          // Look for back camera
+          for (const device of devices) {
+            if (device.label.toLowerCase().includes("back") || device.label.toLowerCase().includes("rear")) {
+              cameraId = device.id;
+              break;
+            }
+          }
+          
+          html5QrCode.start(
+            cameraId, 
+            config, 
+            qrCodeSuccessCallback,
+            (errorMessage) => {
+              // ignore verbose scanner logs
+            }
+          ).then(() => {
+            isScanning = true;
+            toggleBtn.textContent = "Matikan Kamera";
+            infoText.textContent = "Kamera aktif. Arahkan ke kode QR peserta.";
+            infoText.className = "text-center text-xs text-emerald-400 font-medium";
+            scanLine.style.display = "block";
+          }).catch(err => {
+            console.error("Gagal start scanner:", err);
+            handleScannerError();
+          });
+        } else {
+          handleScannerError("Kamera tidak ditemukan.");
+        }
+      }).catch(err => {
+        console.error("Gagal getCameras:", err);
+        handleScannerError();
+      });
+    }
+
+    function stopScanner() {
+      if (!isScanning || !html5QrCode) return Promise.resolve();
+      
+      return html5QrCode.stop().then(() => {
+        isScanning = false;
+        toggleBtn.textContent = "Aktifkan Kamera";
+        infoText.textContent = "Kamera dinonaktifkan.";
+        infoText.className = "text-center text-xs text-white/40";
+        scanLine.style.display = "none";
+      }).catch(err => {
+        console.error("Gagal stop scanner:", err);
+      });
+    }
+
+    function toggleScanner() {
+      if (isScanning) {
+        stopScanner();
+      } else {
+        startScanner();
+      }
+    }
+
+    function handleScannerError(msg = "Izin kamera ditolak atau tidak didukung.") {
+      isScanning = false;
+      toggleBtn.textContent = "Coba Lagi";
+      infoText.textContent = msg + " Silakan gunakan input manual.";
+      infoText.className = "text-center text-xs text-amber-400 font-medium px-4";
+      scanLine.style.display = "none";
+    }
+
+    // Synthesize scan beep sound
+    function playBeep() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); // 800 Hz beep
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.1); // 100ms
+      } catch (e) {
+        console.warn("AudioContext beep failed:", e);
+      }
+    }
+    
+    // Scan again helper triggered from Result card
+    function resetScan() {
+      document.getElementById("checkin-result").innerHTML = "";
+      if (!isScanning) {
+        startScanner();
+      }
+    }
+  </script>
+</body>
+</html>
+
+{{ define "checkin_success" }}
+<div class="bg-emerald-500/10 border border-emerald-500/30 rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden animate-fade-in">
+  <div class="absolute -top-16 -left-16 w-36 h-36 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+  
+  <div class="w-16 h-16 bg-emerald-500/20 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto mb-4 text-emerald-400 shadow-inner">
+    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+    </svg>
+  </div>
+  
+  <h2 class="text-xl font-bold text-emerald-400 mb-1">Check-in Berhasil</h2>
+  <p class="text-xs text-white/50 mb-5">Pukul: {{ .CheckedInAt | formatTime }}</p>
+  
+  <div class="bg-[#0b0c24]/80 border border-white/5 rounded-2xl p-5 text-left space-y-3.5 text-sm mb-5">
+    <div>
+      <span class="text-white/40 text-xs block mb-0.5">Nama Lengkap</span>
+      <span class="font-bold text-white text-base">{{ .Participant.FullName }}</span>
+    </div>
+    
+    <div class="grid grid-cols-2 gap-3 pt-2 border-t border-white/5">
+      <div>
+        <span class="text-white/40 text-xs block mb-0.5">Nomor Registrasi</span>
+        <span class="font-mono text-indigo-300 text-sm font-semibold">{{ .Participant.RegistrationNumber }}</span>
+      </div>
+      <div>
+        <span class="text-white/40 text-xs block mb-0.5">WhatsApp</span>
+        <span class="font-medium text-white text-sm">{{ .Participant.Phone }}</span>
+      </div>
+    </div>
+    
+    <div class="grid grid-cols-2 gap-3 pt-2 border-t border-white/5">
+      <div>
+        <span class="text-white/40 text-xs block mb-0.5">Perusahaan</span>
+        <span class="font-semibold text-white text-sm truncate block" title="{{ .Participant.CompanyName }}">{{ .Participant.CompanyName }}</span>
+      </div>
+      <div>
+        <span class="text-white/40 text-xs block mb-0.5">Jabatan</span>
+        <span class="font-medium text-white text-sm truncate block" title="{{ if .Participant.JobTitle }}{{ .Participant.JobTitle }}{{ else }}-{{ end }}">
+          {{ if .Participant.JobTitle }}{{ .Participant.JobTitle }}{{ else }}-{{ end }}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <button onclick="resetScan()" class="w-full btn-secondary text-white font-medium py-3 px-4 rounded-xl text-xs transition-colors">
+    Scan Selanjutnya
+  </button>
+</div>
+{{ end }}
+
+{{ define "checkin_duplicate" }}
+<div class="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden animate-fade-in">
+  <div class="absolute -top-16 -left-16 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"></div>
+  
+  <div class="w-16 h-16 bg-amber-500/20 border border-amber-500/30 rounded-full flex items-center justify-center mx-auto mb-4 text-amber-400 shadow-inner">
+    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
+  </div>
+  
+  <h2 class="text-xl font-bold text-amber-400 mb-1">Sudah Check-in</h2>
+  <p class="text-xs text-white/50 mb-5">Peserta ini terdaftar sudah melakukan check-in.</p>
+  
+  <div class="bg-[#0b0c24]/80 border border-white/5 rounded-2xl p-5 text-left space-y-3.5 text-sm mb-5">
+    <div>
+      <span class="text-white/40 text-xs block mb-0.5">Nama Lengkap</span>
+      <span class="font-bold text-white text-base">{{ .Participant.FullName }}</span>
+    </div>
+    
+    <div class="grid grid-cols-2 gap-3 pt-2 border-t border-white/5">
+      <div>
+        <span class="text-white/40 text-xs block mb-0.5">Nomor Registrasi</span>
+        <span class="font-mono text-indigo-300 text-sm font-semibold">{{ .Participant.RegistrationNumber }}</span>
+      </div>
+      <div>
+        <span class="text-white/40 text-xs block mb-0.5">Waktu Check-in</span>
+        <span class="font-semibold text-amber-300 text-sm">{{ .CheckedInAt | formatTime }}</span>
+      </div>
+    </div>
+  </div>
+
+  <button onclick="resetScan()" class="w-full btn-secondary text-white font-medium py-3 px-4 rounded-xl text-xs transition-colors">
+    Kembali Scan
+  </button>
+</div>
+{{ end }}
+
+{{ define "checkin_invalid" }}
+<div class="bg-red-500/10 border border-red-500/30 rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden animate-fade-in">
+  <div class="absolute -top-16 -left-16 w-36 h-36 bg-red-500/10 rounded-full blur-2xl pointer-events-none"></div>
+  
+  <div class="w-16 h-16 bg-red-500/20 border border-red-500/30 rounded-full flex items-center justify-center mx-auto mb-4 text-red-400 shadow-inner">
+    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  </div>
+  
+  <h2 class="text-xl font-bold text-red-400 mb-1">Check-in Gagal</h2>
+  <p class="text-sm text-white/70 mb-6">{{ .Message }}</p>
+
+  <button onclick="resetScan()" class="w-full btn-secondary text-white font-medium py-3 px-4 rounded-xl text-xs transition-colors">
+    Coba Lagi
+  </button>
+</div>
+{{ end }}

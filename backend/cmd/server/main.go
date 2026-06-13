@@ -82,7 +82,7 @@ func main() {
 	})
 
 	// ── Register all routes ───────────────────────────────────
-	routes.Register(app, db, storageService, cfg.AdminUsername, cfg.AdminPassword, store)
+	routes.Register(app, db, storageService, cfg.AdminUsername, cfg.AdminPassword, store, cfg.SessionSecret)
 
 	// ── Start server ──────────────────────────────────────────
 	addr := ":" + cfg.AppPort

@@ -48,6 +48,7 @@ type PageHandler struct {
 	eventService        *services.EventService
 	participantService  *services.ParticipantService
 	notificationService *services.NotificationService
+	checkinService      *services.CheckinService
 	tmpl                *template.Template
 }
 
@@ -56,9 +57,10 @@ func NewPageHandler(
 	eventService *services.EventService,
 	participantService *services.ParticipantService,
 	notificationService *services.NotificationService,
+	checkinService *services.CheckinService,
 ) (*PageHandler, error) {
 	funcMap := buildFuncMap()
-	t, err := template.New("").Funcs(funcMap).ParseFS(templ.Files, "landing.html", "register.html", "success.html", "event_public.html")
+	t, err := template.New("").Funcs(funcMap).ParseFS(templ.Files, "landing.html", "register.html", "success.html", "event_public.html", "checkin.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse templates: %w", err)
 	}
@@ -66,6 +68,7 @@ func NewPageHandler(
 		eventService:        eventService,
 		participantService:  participantService,
 		notificationService: notificationService,
+		checkinService:      checkinService,
 		tmpl:                t,
 	}, nil
 }
@@ -202,6 +205,74 @@ func (h *PageHandler) Success(c *fiber.Ctx) error {
 		Event:       event,
 		WALink:      waLink,
 	})
+}
+
+// CheckinPage handles GET /checkin
+func (h *PageHandler) CheckinPage(c *fiber.Ctx) error {
+	event, err := h.eventService.GetFirst()
+	if err != nil {
+		event = &models.Event{Title: "GatherHub Event"}
+	}
+	return h.render(c, "checkin.html", fiber.Map{
+		"Event": event,
+	})
+}
+
+// CheckinSubmit handles POST /checkin
+func (h *PageHandler) CheckinSubmit(c *fiber.Ctx) error {
+	token := strings.TrimSpace(c.FormValue("token"))
+	if token == "" {
+		var buf bytes.Buffer
+		_ = h.tmpl.ExecuteTemplate(&buf, "checkin_invalid", fiber.Map{
+			"Message": "Token QR kosong atau tidak ditemukan.",
+		})
+		c.Set("Content-Type", "text/html; charset=utf-8")
+		return c.Status(fiber.StatusOK).Send(buf.Bytes())
+	}
+
+	// 1. Verify token signature and authenticity
+	payload, err := h.checkinService.VerifyQRToken(token)
+	if err != nil {
+		var buf bytes.Buffer
+		_ = h.tmpl.ExecuteTemplate(&buf, "checkin_invalid", fiber.Map{
+			"Message": "QR Code tidak valid atau tanda tangan digital salah.",
+		})
+		c.Set("Content-Type", "text/html; charset=utf-8")
+		return c.Status(fiber.StatusOK).Send(buf.Bytes())
+	}
+
+	// 2. Attempt checking in
+	att, err := h.checkinService.Checkin(payload.ParticipantID, payload.EventID)
+	if err != nil {
+		var buf bytes.Buffer
+		if strings.Contains(err.Error(), "sudah melakukan check-in") {
+			// Fetch the existing attendance record to display who and when they checked in
+			existingAtt, getErr := h.checkinService.GetAttendance(payload.ParticipantID, payload.EventID)
+			if getErr == nil {
+				_ = h.tmpl.ExecuteTemplate(&buf, "checkin_duplicate", existingAtt)
+			} else {
+				// Fallback if we couldn't load detail
+				_ = h.tmpl.ExecuteTemplate(&buf, "checkin_invalid", fiber.Map{
+					"Message": "Peserta sudah terdaftar check-in, tetapi detail tidak ditemukan.",
+				})
+			}
+			c.Set("Content-Type", "text/html; charset=utf-8")
+			return c.Status(fiber.StatusOK).Send(buf.Bytes())
+		}
+
+		// Handle other validation messages (e.g. participant not verified, participant not found)
+		_ = h.tmpl.ExecuteTemplate(&buf, "checkin_invalid", fiber.Map{
+			"Message": err.Error(),
+		})
+		c.Set("Content-Type", "text/html; charset=utf-8")
+		return c.Status(fiber.StatusOK).Send(buf.Bytes())
+	}
+
+	// 3. Success
+	var buf bytes.Buffer
+	_ = h.tmpl.ExecuteTemplate(&buf, "checkin_success", att)
+	c.Set("Content-Type", "text/html; charset=utf-8")
+	return c.Status(fiber.StatusOK).Send(buf.Bytes())
 }
 
 // ─────────────────────── Helpers ───────────────────────
