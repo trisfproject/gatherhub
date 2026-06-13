@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"log"
 	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -169,6 +170,15 @@ type AdminSettingsData struct {
 	Stats               *services.ParticipantStats
 }
 
+type AdminBackupsData struct {
+	AdminUser    string
+	AdminRole    string
+	Backups      []services.BackupInfo
+	Stats        *services.ParticipantStats
+	FlashSuccess string
+	FlashError   string
+}
+
 // ─────────────────────── Handler ───────────────────────
 
 // AdminHandler handles all admin panel routes
@@ -182,6 +192,7 @@ type AdminHandler struct {
 	auditLogService     *services.AuditLogService
 	checkinService      *services.CheckinService
 	settingsService     *services.SettingsService
+	backupService       *services.BackupService
 	tmpl                *template.Template
 }
 
@@ -196,6 +207,7 @@ func NewAdminHandler(
 	auditLogService *services.AuditLogService,
 	checkinService *services.CheckinService,
 	settingsService *services.SettingsService,
+	backupService *services.BackupService,
 ) (*AdminHandler, error) {
 	funcMap := buildAdminFuncMap()
 	funcMap["setting"] = func(key string) string {
@@ -222,6 +234,7 @@ func NewAdminHandler(
 		"admin_notifications.html",
 		"admin_audit_logs.html",
 		"admin_participant_qr.html",
+		"admin_backups.html",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse admin templates: %w", err)
@@ -236,6 +249,7 @@ func NewAdminHandler(
 		auditLogService:     auditLogService,
 		checkinService:      checkinService,
 		settingsService:     settingsService,
+		backupService:       backupService,
 		tmpl:                t,
 	}, nil
 }
@@ -2072,4 +2086,150 @@ func (h *AdminHandler) ParticipantQRPage(c *fiber.Ctx) error {
 		QRToken:     token,
 		Stats:       stats,
 	})
+}
+
+// BackupsPage handles GET /admin/backups
+func (h *AdminHandler) BackupsPage(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+	stats, _ := h.participantService.GetStats()
+
+	backups, err := h.backupService.ListBackups()
+	if err != nil {
+		setFlash(c, "error", "Gagal memuat daftar backup: "+err.Error())
+		backups = []services.BackupInfo{}
+	}
+
+	return h.render(c, "admin_backups.html", AdminBackupsData{
+		AdminUser:    adminUser,
+		AdminRole:    adminRole,
+		Backups:      backups,
+		Stats:        stats,
+		FlashSuccess: getFlash(c, "success"),
+		FlashError:   getFlash(c, "error"),
+	})
+}
+
+// CreateBackupSubmit handles POST /admin/backups/create
+func (h *AdminHandler) CreateBackupSubmit(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	filename, err := h.backupService.CreateBackup()
+	if err != nil {
+		setFlash(c, "error", "Gagal membuat backup: "+err.Error())
+		return c.Redirect("/admin/backups", fiber.StatusSeeOther)
+	}
+
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, "CREATE", "BACKUP", 0, nil, map[string]string{"filename": filename}, c.IP(), c.Get("User-Agent"))
+	}
+
+	setFlash(c, "success", "Backup \""+filename+"\" berhasil dibuat.")
+	return c.Redirect("/admin/backups", fiber.StatusSeeOther)
+}
+
+// DownloadBackup handles GET /admin/backups/download/:filename
+func (h *AdminHandler) DownloadBackup(c *fiber.Ctx) error {
+	filename := c.Params("filename")
+	cleaned := filepath.Base(filename)
+	filePath := filepath.Join(h.storageService.GetRootPath(), "backups", cleaned)
+
+	if _, err := os.Stat(filePath); err != nil {
+		setFlash(c, "error", "File backup tidak ditemukan.")
+		return c.Redirect("/admin/backups", fiber.StatusSeeOther)
+	}
+
+	return c.Download(filePath, cleaned)
+}
+
+// RestoreBackupSubmit handles POST /admin/backups/restore/:filename
+func (h *AdminHandler) RestoreBackupSubmit(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	filename := c.Params("filename")
+	cleaned := filepath.Base(filename)
+
+	err := h.backupService.RestoreBackup(cleaned)
+	if err != nil {
+		setFlash(c, "error", "Gagal memulihkan backup: "+err.Error())
+		return c.Redirect("/admin/backups", fiber.StatusSeeOther)
+	}
+
+	// Reload settings cache
+	if err := h.settingsService.Load(); err != nil {
+		log.Printf("Warning: failed to reload settings cache after restore: %v", err)
+	}
+
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, "RESTORE", "BACKUP", 0, nil, map[string]string{"filename": cleaned}, c.IP(), c.Get("User-Agent"))
+	}
+
+	setFlash(c, "success", "Backup \""+cleaned+"\" berhasil dipulihkan.")
+	return c.Redirect("/admin/backups", fiber.StatusSeeOther)
+}
+
+// UploadRestoreBackup handles POST /admin/backups/upload
+func (h *AdminHandler) UploadRestoreBackup(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+
+	file, err := c.FormFile("backup_file")
+	if err != nil {
+		setFlash(c, "error", "Gagal mengunggah file: "+err.Error())
+		return c.Redirect("/admin/backups", fiber.StatusSeeOther)
+	}
+
+	if !strings.HasSuffix(strings.ToLower(file.Filename), ".zip") {
+		setFlash(c, "error", "Format file tidak valid. Harus berupa file .zip.")
+		return c.Redirect("/admin/backups", fiber.StatusSeeOther)
+	}
+
+	backupsDir := filepath.Join(h.storageService.GetRootPath(), "backups")
+	if err := os.MkdirAll(backupsDir, 0755); err != nil {
+		setFlash(c, "error", "Gagal menyiapkan folder backup: "+err.Error())
+		return c.Redirect("/admin/backups", fiber.StatusSeeOther)
+	}
+
+	cleanedName := filepath.Base(file.Filename)
+	destPath := filepath.Join(backupsDir, cleanedName)
+
+	if err := c.SaveFile(file, destPath); err != nil {
+		setFlash(c, "error", "Gagal menyimpan file backup: "+err.Error())
+		return c.Redirect("/admin/backups", fiber.StatusSeeOther)
+	}
+
+	err = h.backupService.RestoreBackup(cleanedName)
+	if err != nil {
+		setFlash(c, "error", "Gagal memulihkan backup yang diunggah: "+err.Error())
+		return c.Redirect("/admin/backups", fiber.StatusSeeOther)
+	}
+
+	// Reload settings cache
+	if err := h.settingsService.Load(); err != nil {
+		log.Printf("Warning: failed to reload settings cache after restore: %v", err)
+	}
+
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, "RESTORE", "BACKUP", 0, nil, map[string]string{"filename": cleanedName, "uploaded": "true"}, c.IP(), c.Get("User-Agent"))
+	}
+
+	setFlash(c, "success", "Backup \""+cleanedName+"\" berhasil diunggah dan dipulihkan.")
+	return c.Redirect("/admin/backups", fiber.StatusSeeOther)
+}
+
+// DeleteBackupSubmit handles POST /admin/backups/delete/:filename
+func (h *AdminHandler) DeleteBackupSubmit(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	filename := c.Params("filename")
+	cleaned := filepath.Base(filename)
+
+	err := h.backupService.DeleteBackup(cleaned)
+	if err != nil {
+		setFlash(c, "error", "Gagal menghapus backup: "+err.Error())
+		return c.Redirect("/admin/backups", fiber.StatusSeeOther)
+	}
+
+	if h.auditLogService != nil {
+		_ = h.auditLogService.Log(adminUser, "DELETE", "BACKUP", 0, nil, map[string]string{"filename": cleaned}, c.IP(), c.Get("User-Agent"))
+	}
+
+	setFlash(c, "success", "Backup \""+cleaned+"\" berhasil dihapus.")
+	return c.Redirect("/admin/backups", fiber.StatusSeeOther)
 }

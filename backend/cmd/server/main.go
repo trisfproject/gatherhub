@@ -87,8 +87,11 @@ func main() {
 		CookieSameSite: "Lax",
 	})
 
+	// ── Initialize backup service ─────────────────────────────
+	backupService := services.NewBackupService(cfg)
+
 	// ── Register all routes ───────────────────────────────────
-	routes.Register(app, db, storageService, cfg.AdminUsername, cfg.AdminPassword, store, cfg.SessionSecret, settingsService)
+	routes.Register(app, db, storageService, cfg.AdminUsername, cfg.AdminPassword, store, cfg.SessionSecret, settingsService, backupService)
 
 	// ── Start server ──────────────────────────────────────────
 	addr := ":" + cfg.AppPort

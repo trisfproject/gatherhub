@@ -20,12 +20,12 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 # ---
 
 # Runtime stage
-FROM alpine:3.20
+FROM alpine:3.21
 
 WORKDIR /app
 
 # Install runtime deps
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata postgresql-client
 
 # Set timezone
 ENV TZ=Asia/Jakarta

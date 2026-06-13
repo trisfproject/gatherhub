@@ -14,7 +14,7 @@ import (
 
 // Register sets up all application routes.
 // storage holds the resolved paths for all upload directories.
-func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageService, adminUsername, adminPassword string, store *session.Store, sessionSecret string, settingsService *services.SettingsService) {
+func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageService, adminUsername, adminPassword string, store *session.Store, sessionSecret string, settingsService *services.SettingsService, backupService *services.BackupService) {
 	// ── Services ──────────────────────────────────────────────
 	auditLogService := services.NewAuditLogService(db)
 	checkinService := services.NewCheckinService(db, sessionSecret)
@@ -35,7 +35,7 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 		log.Fatalf("Failed to initialise page handler: %v", err)
 	}
 
-	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storageService, notificationService, auditLogService, checkinService, settingsService)
+	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storageService, notificationService, auditLogService, checkinService, settingsService, backupService)
 	if err != nil {
 		log.Fatalf("Failed to initialise admin handler: %v", err)
 	}
@@ -106,6 +106,15 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	admin.Post("/events/:id/status", adminHandler.EventUpdateStatus)
 	admin.Delete("/events/:id", adminHandler.EventDelete)
 	admin.Post("/events/:id/delete", adminHandler.EventDelete)
+
+	// Backup management routes
+	admin.Get("/backups", adminHandler.BackupsPage)
+	admin.Post("/backups/create", adminHandler.CreateBackupSubmit)
+	admin.Get("/backups/download/:filename", adminHandler.DownloadBackup)
+	admin.Post("/backups/restore/:filename", adminHandler.RestoreBackupSubmit)
+	admin.Post("/backups/upload", adminHandler.UploadRestoreBackup)
+	admin.Post("/backups/delete/:filename", adminHandler.DeleteBackupSubmit)
+
 
 	// Admin management & settings (SUPER_ADMIN only)
 	superAdmin := admin.Group("/", middleware.RequireRole(store, "SUPER_ADMIN"))
