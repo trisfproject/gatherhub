@@ -90,9 +90,10 @@ func main() {
 
 	// ── Initialize Fiber app ──────────────────────────────────
 	app := fiber.New(fiber.Config{
-		AppName:     fmt.Sprintf("GatherHub %s", services.AppVersion),
-		BodyLimit:   11 * 1024 * 1024, // 11 MB — accommodates 10 MB file + form fields
-		ProxyHeader: fiber.HeaderXForwardedFor,
+		AppName:      fmt.Sprintf("GatherHub %s", services.AppVersion),
+		BodyLimit:    11 * 1024 * 1024, // 11 MB — accommodates 10 MB file + form fields
+		ProxyHeader:  fiber.HeaderXForwardedFor,
+		ErrorHandler: middleware.CustomErrorHandler,
 	})
 
 	// ── Global middleware ─────────────────────────────────────
@@ -119,6 +120,8 @@ func main() {
 	// ── Initialize session store ──────────────────────────────
 	store := session.New(session.Config{
 		Expiration:     8 * time.Hour,
+		CookieName:     "gatherhub_session_id",
+		CookiePath:     "/",
 		CookieHTTPOnly: true,
 		CookieSecure:   cfg.AppEnv == "production",
 		CookieSameSite: "Lax",

@@ -1844,6 +1844,18 @@ func (h *AdminHandler) SystemSettingsSubmit(c *fiber.Ctx) error {
 	}
 	if storagePath == "" {
 		errs = append(errs, "Path Penyimpanan wajib diisi")
+	} else {
+		if err := os.MkdirAll(storagePath, 0755); err != nil {
+			errs = append(errs, "Path Penyimpanan tidak dapat dibuat atau diakses: "+err.Error())
+		} else {
+			tempFile, err := os.CreateTemp(storagePath, ".settings_write_test_*")
+			if err != nil {
+				errs = append(errs, "Path Penyimpanan tidak dapat ditulis (tidak memiliki izin menulis): "+err.Error())
+			} else {
+				tempFile.Close()
+				os.Remove(tempFile.Name())
+			}
+		}
 	}
 
 	if len(errs) > 0 {

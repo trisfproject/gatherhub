@@ -215,42 +215,55 @@ func (s *BackupService) RestoreBackup(filename string) error {
 
 	// Extract files
 	for _, f := range reader.File {
-		rc, err := f.Open()
+		err := func() error {
+			rc, err := f.Open()
+			if err != nil {
+				return err
+			}
+			defer rc.Close()
+
+			if f.FileInfo().IsDir() {
+				return nil
+			}
+
+			if f.Name == "database_backup.sql" {
+				sqlFile = filepath.Join(tempDir, "database_backup.sql")
+				dst, err := os.Create(sqlFile)
+				if err != nil {
+					return err
+				}
+				defer dst.Close()
+				if _, err := io.Copy(dst, rc); err != nil {
+					return err
+				}
+			} else if strings.HasPrefix(f.Name, "uploads/") {
+				strippedPath := strings.TrimPrefix(f.Name, "uploads/")
+				dstPath := filepath.Join(s.cfg.StoragePath, strippedPath)
+
+				// Prevent path traversal (Zip Slip vulnerability)
+				cleanedBase := filepath.Clean(s.cfg.StoragePath)
+				cleanedDst := filepath.Clean(dstPath)
+				if !strings.HasPrefix(cleanedDst, cleanedBase+string(filepath.Separator)) && cleanedDst != cleanedBase {
+					return fmt.Errorf("path traversal detected in ZIP: %s", f.Name)
+				}
+
+				if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+					return err
+				}
+
+				dst, err := os.Create(dstPath)
+				if err != nil {
+					return err
+				}
+				defer dst.Close()
+				if _, err := io.Copy(dst, rc); err != nil {
+					return err
+				}
+			}
+			return nil
+		}()
 		if err != nil {
 			return err
-		}
-		defer rc.Close()
-
-		if f.FileInfo().IsDir() {
-			continue
-		}
-
-		if f.Name == "database_backup.sql" {
-			sqlFile = filepath.Join(tempDir, "database_backup.sql")
-			dst, err := os.Create(sqlFile)
-			if err != nil {
-				return err
-			}
-			defer dst.Close()
-			if _, err := io.Copy(dst, rc); err != nil {
-				return err
-			}
-		} else if strings.HasPrefix(f.Name, "uploads/") {
-			strippedPath := strings.TrimPrefix(f.Name, "uploads/")
-			dstPath := filepath.Join(s.cfg.StoragePath, strippedPath)
-
-			if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
-				return err
-			}
-
-			dst, err := os.Create(dstPath)
-			if err != nil {
-				return err
-			}
-			defer dst.Close()
-			if _, err := io.Copy(dst, rc); err != nil {
-				return err
-			}
 		}
 	}
 

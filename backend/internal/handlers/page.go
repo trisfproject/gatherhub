@@ -340,7 +340,7 @@ func (h *PageHandler) renderError(c *fiber.Ctx, message, backURL string) error {
   <a href="%s" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 font-semibold px-6 py-3 rounded-xl text-sm transition-colors">
     Kembali
   </a>
-</div></body></html>`, message, backURL)
+</div></body></html>`, template.HTMLEscapeString(message), template.HTMLEscapeString(backURL))
 	c.Set("Content-Type", "text/html; charset=utf-8")
 	return c.Status(fiber.StatusNotFound).SendString(html)
 }

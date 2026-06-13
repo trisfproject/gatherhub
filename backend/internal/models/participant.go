@@ -17,7 +17,7 @@ const (
 // Participant represents a person who registered for an event
 type Participant struct {
 	ID                 uint              `json:"id" gorm:"primaryKey;autoIncrement"`
-	EventID            uint              `json:"event_id" gorm:"not null;index"`
+	EventID            uint              `json:"event_id" gorm:"not null;index;index:idx_event_status"`
 	RegistrationNumber string            `json:"registration_number" gorm:"uniqueIndex;size:20"`
 	FullName           string            `json:"full_name" gorm:"not null;size:255"`
 	Phone              string            `json:"phone" gorm:"not null;size:20"`
@@ -28,10 +28,10 @@ type Participant struct {
 	TelegramUsername   string            `json:"telegram_username" gorm:"size:100"`
 	JobTitle           *string           `json:"job_title" gorm:"size:255"`
 	PaymentProof       string            `json:"payment_proof" gorm:"size:500"`
-	Status             ParticipantStatus `json:"status" gorm:"not null;default:PENDING;size:20"`
+	Status             ParticipantStatus `json:"status" gorm:"not null;default:PENDING;size:20;index;index:idx_event_status"`
 	VerifiedAt         *time.Time        `json:"verified_at,omitempty"`
 	RejectedAt         *time.Time        `json:"rejected_at,omitempty"`
-	CreatedAt          time.Time         `json:"created_at"`
+	CreatedAt          time.Time         `json:"created_at" gorm:"index"`
 	UpdatedAt          time.Time         `json:"updated_at"`
 
 	// Associations
