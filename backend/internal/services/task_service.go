@@ -88,3 +88,39 @@ func (s *TaskService) GetTaskStats(eventID uint) (openCount, overdueCount, compl
 
 	return int(open), int(overdue), int(completed), nil
 }
+
+// GetTaskStatsDetailed calculates detailed task counts.
+func (s *TaskService) GetTaskStatsDetailed(eventID uint) (totalCount, completedCount, inProgressCount, overdueCount int, err error) {
+	var total, completed, inProgress, overdue int64
+	now := time.Now()
+
+	err = s.db.Model(&models.Task{}).
+		Where("event_id = ?", eventID).
+		Count(&total).Error
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+
+	err = s.db.Model(&models.Task{}).
+		Where("event_id = ? AND status = 'Done'", eventID).
+		Count(&completed).Error
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+
+	err = s.db.Model(&models.Task{}).
+		Where("event_id = ? AND status = 'In Progress'", eventID).
+		Count(&inProgress).Error
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+
+	err = s.db.Model(&models.Task{}).
+		Where("event_id = ? AND status IN ('Todo', 'In Progress') AND due_date < ?", eventID, now).
+		Count(&overdue).Error
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+
+	return int(total), int(completed), int(inProgress), int(overdue), nil
+}

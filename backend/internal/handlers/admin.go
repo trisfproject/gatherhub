@@ -52,6 +52,9 @@ type AdminDashboardData struct {
 	OpenTasksCount      int
 	OverdueTasksCount   int
 	CompletedTasksCount int
+	TotalTasksCount     int
+	InProgressTasksCount int
+	ProgressPercentage  int
 	TasksJSON           string
 }
 
@@ -64,6 +67,10 @@ type AdminTasksData struct {
 	CategoryFilter  string
 	PriorityFilter  string
 	StatusFilter    string
+	TotalTasksCount      int
+	CompletedTasksCount  int
+	InProgressTasksCount int
+	OverdueTasksCount    int
 	FlashSuccess    string
 	FlashError      string
 }
@@ -443,16 +450,24 @@ func (h *AdminHandler) Dashboard(c *fiber.Ctx) error {
 	openTasksCount := 0
 	overdueTasksCount := 0
 	completedTasksCount := 0
+	totalTasksCount := 0
+	inProgressTasksCount := 0
+	progressPercentage := 0
 	tasksJSON := "[]"
 
 	if selectedEventID > 0 {
 		if count, err := h.sponsorService.GetCountByEvent(selectedEventID); err == nil {
 			sponsorCount = int(count)
 		}
-		if open, overdue, completed, err := h.taskService.GetTaskStats(selectedEventID); err == nil {
-			openTasksCount = open
-			overdueTasksCount = overdue
+		if total, completed, inProg, overdue, err := h.taskService.GetTaskStatsDetailed(selectedEventID); err == nil {
+			totalTasksCount = total
 			completedTasksCount = completed
+			inProgressTasksCount = inProg
+			overdueTasksCount = overdue
+			openTasksCount = total - completed
+			if total > 0 {
+				progressPercentage = (completed * 100) / total
+			}
 		}
 		if tasks, err := h.taskService.GetTasksByEvent(selectedEventID, "", "", ""); err == nil && len(tasks) > 0 {
 			type calendarTask struct {
@@ -504,6 +519,9 @@ func (h *AdminHandler) Dashboard(c *fiber.Ctx) error {
 		OpenTasksCount:      openTasksCount,
 		OverdueTasksCount:   overdueTasksCount,
 		CompletedTasksCount: completedTasksCount,
+		TotalTasksCount:     totalTasksCount,
+		InProgressTasksCount: inProgressTasksCount,
+		ProgressPercentage:  progressPercentage,
 		TasksJSON:           tasksJSON,
 	})
 }
@@ -3073,7 +3091,7 @@ func BuildSidebarItems(role string, active string, stats *services.ParticipantSt
 			Active: active == "sponsors",
 		},
 		{
-			Title:  "Manajemen Tugas",
+			Title:  "Persiapan Acara",
 			URL:    "/admin/tasks",
 			Icon:   `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>`,
 			Active: active == "tasks",
@@ -3933,6 +3951,14 @@ func (h *AdminHandler) TaskList(c *fiber.Ctx) error {
 		}
 	}
 
+	totalCount := 0
+	completedCount := 0
+	inProgressCount := 0
+	overdueCount := 0
+	if selectedEventID > 0 {
+		totalCount, completedCount, inProgressCount, overdueCount, _ = h.taskService.GetTaskStatsDetailed(selectedEventID)
+	}
+
 	stats, _ := h.participantService.GetStats()
 
 	return h.render(c, "admin_tasks.html", AdminTasksData{
@@ -3949,6 +3975,10 @@ func (h *AdminHandler) TaskList(c *fiber.Ctx) error {
 		CategoryFilter:  categoryFilter,
 		PriorityFilter:  priorityFilter,
 		StatusFilter:    statusFilter,
+		TotalTasksCount:      totalCount,
+		CompletedTasksCount:  completedCount,
+		InProgressTasksCount: inProgressCount,
+		OverdueTasksCount:    overdueCount,
 		FlashSuccess:    getFlash(c, "success"),
 		FlashError:      getFlash(c, "error"),
 	})
@@ -4343,5 +4373,73 @@ func (h *AdminHandler) TaskDelete(c *fiber.Ctx) error {
 	}
 
 	setFlash(c, "success", "Tugas \""+task.Title+"\" berhasil dihapus.")
+	return c.Redirect("/admin/tasks?event_id="+eventIDStr, fiber.StatusSeeOther)
+}
+
+// TaskCreateStarter handles POST /admin/tasks/starter
+func (h *AdminHandler) TaskCreateStarter(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+
+	eventIDStr := c.FormValue("event_id")
+	title := strings.TrimSpace(c.FormValue("title"))
+	category := strings.TrimSpace(c.FormValue("category"))
+
+	var errs []string
+	var eventID int
+	var err error
+	if eventIDStr != "" {
+		eventID, err = strconv.Atoi(eventIDStr)
+		if err != nil || eventID <= 0 {
+			errs = append(errs, "Pilihan Acara tidak valid")
+		}
+	} else {
+		errs = append(errs, "Acara wajib dipilih")
+	}
+
+	if title == "" {
+		errs = append(errs, "Judul tugas wajib diisi")
+	}
+	if category == "" {
+		errs = append(errs, "Kategori wajib diisi")
+	}
+
+	if len(errs) > 0 {
+		setFlash(c, "error", strings.Join(errs, ", "))
+		return c.Redirect("/admin/tasks?event_id="+eventIDStr, fiber.StatusSeeOther)
+	}
+
+	// Default values
+	priority := "Medium"
+	status := "Todo"
+	dueDate := time.Now().Add(7 * 24 * time.Hour) // 7 days from now
+
+	// If the event exists and has a date, we can set due date to 1 day before the event
+	if event, err := h.eventService.GetByID(uint(eventID)); err == nil && event != nil {
+		eventPrevDay := event.EventDate.Add(-24 * time.Hour)
+		if eventPrevDay.After(time.Now()) {
+			dueDate = eventPrevDay
+		}
+	}
+
+	newTask := &models.Task{
+		EventID:     uint(eventID),
+		Title:       title,
+		Description: "Tugas starter untuk persiapan acara: " + title + ".",
+		Category:    category,
+		Priority:    priority,
+		DueDate:     dueDate,
+		AssignedTo:  "Organisator",
+		Status:      status,
+	}
+
+	if err := h.taskService.Create(newTask); err != nil {
+		setFlash(c, "error", "Gagal membuat tugas starter: "+err.Error())
+	} else {
+		if h.auditLogService != nil {
+			_ = h.auditLogService.Log(adminUser, "CREATE", "TASK", newTask.ID, "", newTask, c.IP(), c.Get("User-Agent"))
+		}
+		setFlash(c, "success", "Tugas starter \""+title+"\" berhasil dibuat.")
+	}
+
 	return c.Redirect("/admin/tasks?event_id="+eventIDStr, fiber.StatusSeeOther)
 }

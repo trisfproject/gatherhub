@@ -4,6 +4,7 @@ import io
 import re
 import zipfile
 import sys
+import time
 
 BASE_URL = "http://localhost:3000"
 
@@ -40,7 +41,7 @@ def run_tests():
     
     # Clean up any old event with slug 'waitlist-test' or 'wt-test' if they exist in the DB,
     # or just use a unique slug 'wt-test'
-    test_slug = "wt-test"
+    test_slug = f"wt-test-{int(time.time())}"
     
     # 3. Create a test event with limit = 2 and enable_waiting_list = true
     print(f"[2] Creating test event with slug '{test_slug}' and capacity = 2...")
@@ -200,7 +201,8 @@ def run_tests():
     
     p3_id = None
     # Let's find Participant Three in the page and extract the ID before/after it
-    for link in set(all_links):
+    sorted_links = sorted(list(set(all_links)), key=lambda x: int(x), reverse=True)
+    for link in sorted_links:
         # Check if Participant Three is near this link or if this link page has Participant Three
         detail_test = session.get(f"{BASE_URL}/admin/participants/{link}")
         if "Participant Three" in detail_test.text:

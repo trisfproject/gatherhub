@@ -155,6 +155,7 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	admin.Get("/tasks", adminHandler.TaskList)
 	admin.Get("/tasks/create", adminHandler.TaskCreatePage)
 	admin.Post("/tasks/create", adminHandler.TaskCreateSubmit)
+	admin.Post("/tasks/starter", adminHandler.TaskCreateStarter)
 	admin.Get("/tasks/:id/edit", adminHandler.TaskEditPage)
 	admin.Post("/tasks/:id/edit", adminHandler.TaskEditSubmit)
 	admin.Post("/tasks/:id/delete", adminHandler.TaskDelete)

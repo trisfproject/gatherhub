@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Manajemen Tugas Persiapan — GatherHub Admin</title>
+  <title>Persiapan Acara — GatherHub Admin</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
@@ -27,6 +27,9 @@
     .status-done{background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.3)}
     .status-cancelled{background:rgba(239,68,68,.08);color:rgba(239,68,68,.5);border:1px solid rgba(239,68,68,.15)}
 
+    /* Stats Cards */
+    .stat-card{background:#13132b;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px 20px}
+
     /* Calendar Grid */
     .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
     .calendar-day{aspect-ratio:1.2;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:12px;padding:8px;display:flex;flex-direction:column;justify-content:space-between;transition:all .2s;cursor:pointer}
@@ -49,7 +52,7 @@
 <div class="main-content flex-1">
   <div class="topbar">
     <div>
-      <h2 class="text-base font-bold text-white">Manajemen Tugas Persiapan</h2>
+      <h2 class="text-base font-bold text-white">Persiapan Acara</h2>
       <p class="text-xs text-white/30">Lacak progress, penugasan, dan tenggat waktu persiapan acara</p>
     </div>
     <div class="flex items-center gap-3">
@@ -68,6 +71,14 @@
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
       </svg>
       <span class="text-sm font-semibold">{{.FlashSuccess}}</span>
+    </div>
+    {{end}}
+    {{if .FlashError}}
+    <div class="bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl p-4 flex items-center gap-3 fade-up" id="alert-error">
+      <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+      </svg>
+      <span class="text-sm font-semibold">{{.FlashError}}</span>
     </div>
     {{end}}
 
@@ -132,14 +143,69 @@
       </form>
     </div>
 
+    <!-- Stats Cards Grid -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 fade-up">
+      <!-- Total -->
+      <div class="stat-card">
+        <div class="flex items-start justify-between mb-2">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+            <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+          </div>
+          <span class="text-2xl font-extrabold text-white">{{.TotalTasksCount}}</span>
+        </div>
+        <p class="text-[10px] text-white/40 font-bold uppercase tracking-wider">Total Tugas</p>
+      </div>
+
+      <!-- Completed -->
+      <div class="stat-card border-emerald-500/20">
+        <div class="flex items-start justify-between mb-2">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+          <span class="text-2xl font-extrabold text-emerald-300">{{.CompletedTasksCount}}</span>
+        </div>
+        <p class="text-[10px] text-white/40 font-bold uppercase tracking-wider">Tugas Selesai</p>
+      </div>
+
+      <!-- In Progress -->
+      <div class="stat-card border-blue-500/20">
+        <div class="flex items-start justify-between mb-2">
+          <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+            <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <span class="text-2xl font-extrabold text-blue-300">{{.InProgressTasksCount}}</span>
+        </div>
+        <p class="text-[10px] text-white/40 font-bold uppercase tracking-wider">Sedang Berjalan</p>
+      </div>
+
+      <!-- Overdue -->
+      <div class="stat-card border-red-500/20">
+        <div class="flex items-start justify-between mb-2">
+          <div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
+            <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+          </div>
+          <span class="text-2xl font-extrabold text-red-300 {{if gt .OverdueTasksCount 0}}animate-pulse{{end}}">{{.OverdueTasksCount}}</span>
+        </div>
+        <p class="text-[10px] text-white/40 font-bold uppercase tracking-wider">Tugas Terlambat</p>
+      </div>
+    </div>
+
     <!-- Tab View Toggle & Create Button -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 fade-up">
       <div class="inline-flex p-1 bg-white/5 border border-white/10 rounded-xl">
         <button onclick="switchTab('list')" id="tab-btn-list" class="px-5 py-2 rounded-lg text-sm font-semibold transition-all bg-indigo-600 text-white">
-          Daftar Tugas (List View)
+          Daftar Tugas
         </button>
         <button onclick="switchTab('calendar')" id="tab-btn-calendar" class="px-5 py-2 rounded-lg text-sm font-semibold transition-all text-white/60 hover:text-white">
-          Kalender (Calendar View)
+          Kalender
         </button>
       </div>
 
@@ -212,17 +278,133 @@
         {{end}}
       </div>
       {{else}}
-      <div class="glass p-12 text-center">
+      <div class="glass p-8 max-w-xl mx-auto text-center">
         <div class="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4 border border-white/10">
           <svg class="w-8 h-8 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
           </svg>
         </div>
-        <p class="text-white font-bold text-lg">Belum ada Tugas</p>
-        <p class="text-white/40 text-xs mt-1 max-w-sm mx-auto">Tambahkan tugas persiapan agar progress persiapan acara dapat terpantau dengan baik.</p>
-        <a href="/admin/tasks/create?event_id={{.SelectedEventID}}" class="inline-flex items-center gap-2 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition-colors">
-          Buat Tugas Pertama
-        </a>
+        <p class="text-white font-bold text-lg">Belum ada Tugas Persiapan</p>
+        <p class="text-white/40 text-xs mt-1 mb-6 max-w-sm mx-auto">Mulai dengan daftar periksa (checklist) rekomendasi di bawah ini untuk mempercepat persiapan Anda:</p>
+
+        <!-- Starter Checklist -->
+        <div class="space-y-3 text-left">
+          <!-- Item 1: Confirm Venue -->
+          <div class="bg-white/3 border border-white/5 p-4 rounded-xl flex items-center justify-between hover:bg-white/5 transition-colors">
+            <div class="flex items-center gap-3">
+              <div class="w-2.5 h-2.5 rounded-full bg-indigo-500"></div>
+              <div>
+                <p class="text-sm font-semibold text-white">Confirm Venue (Konfirmasi Lokasi)</p>
+                <p class="text-[10px] text-white/40">Kategori: Lokasi / Venue</p>
+              </div>
+            </div>
+            <form action="/admin/tasks/starter" method="POST">
+              <input type="hidden" name="event_id" value="{{$.SelectedEventID}}">
+              <input type="hidden" name="title" value="Confirm Venue">
+              <input type="hidden" name="category" value="Venue">
+              <button type="submit" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-indigo-500/20 transition-all flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                </svg>
+                Tambah
+              </button>
+            </form>
+          </div>
+
+          <!-- Item 2: Finalize Sponsors -->
+          <div class="bg-white/3 border border-white/5 p-4 rounded-xl flex items-center justify-between hover:bg-white/5 transition-colors">
+            <div class="flex items-center gap-3">
+              <div class="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
+              <div>
+                <p class="text-sm font-semibold text-white">Finalize Sponsors (Finalisasi Sponsor)</p>
+                <p class="text-[10px] text-white/40">Kategori: Sponsor / Partner</p>
+              </div>
+            </div>
+            <form action="/admin/tasks/starter" method="POST">
+              <input type="hidden" name="event_id" value="{{$.SelectedEventID}}">
+              <input type="hidden" name="title" value="Finalize Sponsors">
+              <input type="hidden" name="category" value="Sponsor">
+              <button type="submit" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-indigo-500/20 transition-all flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                </svg>
+                Tambah
+              </button>
+            </form>
+          </div>
+
+          <!-- Item 3: Transportation Coordination -->
+          <div class="bg-white/3 border border-white/5 p-4 rounded-xl flex items-center justify-between hover:bg-white/5 transition-colors">
+            <div class="flex items-center gap-3">
+              <div class="w-2.5 h-2.5 rounded-full bg-pink-500"></div>
+              <div>
+                <p class="text-sm font-semibold text-white">Transportation Coordination (Koordinasi Transportasi)</p>
+                <p class="text-[10px] text-white/40">Kategori: Transportasi</p>
+              </div>
+            </div>
+            <form action="/admin/tasks/starter" method="POST">
+              <input type="hidden" name="event_id" value="{{$.SelectedEventID}}">
+              <input type="hidden" name="title" value="Transportation Coordination">
+              <input type="hidden" name="category" value="Transportation">
+              <button type="submit" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-indigo-500/20 transition-all flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                </svg>
+                Tambah
+              </button>
+            </form>
+          </div>
+
+          <!-- Item 4: Merchandise Preparation -->
+          <div class="bg-white/3 border border-white/5 p-4 rounded-xl flex items-center justify-between hover:bg-white/5 transition-colors">
+            <div class="flex items-center gap-3">
+              <div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+              <div>
+                <p class="text-sm font-semibold text-white">Merchandise Preparation (Persiapan Merchandise)</p>
+                <p class="text-[10px] text-white/40">Kategori: Merchandise</p>
+              </div>
+            </div>
+            <form action="/admin/tasks/starter" method="POST">
+              <input type="hidden" name="event_id" value="{{$.SelectedEventID}}">
+              <input type="hidden" name="title" value="Merchandise Preparation">
+              <input type="hidden" name="category" value="Merchandise">
+              <button type="submit" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-indigo-500/20 transition-all flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                </svg>
+                Tambah
+              </button>
+            </form>
+          </div>
+
+          <!-- Item 5: Participant Broadcast -->
+          <div class="bg-white/3 border border-white/5 p-4 rounded-xl flex items-center justify-between hover:bg-white/5 transition-colors">
+            <div class="flex items-center gap-3">
+              <div class="w-2.5 h-2.5 rounded-full bg-purple-500"></div>
+              <div>
+                <p class="text-sm font-semibold text-white">Participant Broadcast (Siaran Pengumuman Peserta)</p>
+                <p class="text-[10px] text-white/40">Kategori: Siaran / Broadcast</p>
+              </div>
+            </div>
+            <form action="/admin/tasks/starter" method="POST">
+              <input type="hidden" name="event_id" value="{{$.SelectedEventID}}">
+              <input type="hidden" name="title" value="Participant Broadcast">
+              <input type="hidden" name="category" value="Broadcast">
+              <button type="submit" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-indigo-500/20 transition-all flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                </svg>
+                Tambah
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-white/5">
+          <a href="/admin/tasks/create?event_id={{.SelectedEventID}}" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition-colors w-full justify-center">
+            Buat Tugas Kustom
+          </a>
+        </div>
       </div>
       {{end}}
     </div>
