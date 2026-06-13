@@ -19,13 +19,6 @@ func main() {
 	// ── Load configuration ────────────────────────────────────
 	cfg := config.Load()
 
-	// ── Initialize storage ────────────────────────────────────
-	// All runtime uploads live under STORAGE_PATH, outside the Git repository.
-	storageService, err := services.NewStorageService(cfg.StoragePath)
-	if err != nil {
-		log.Fatalf("Failed to initialize storage service: %v", err)
-	}
-
 	// ── Connect to database ───────────────────────────────────
 	db, err := database.Connect(cfg)
 	if err != nil {
@@ -35,6 +28,19 @@ func main() {
 	// ── Run auto migrations ───────────────────────────────────
 	if err := database.AutoMigrate(db); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
+	}
+
+	// ── Load Settings Service ─────────────────────────────────
+	settingsService := services.NewSettingsService(db)
+	if err := settingsService.Load(); err != nil {
+		log.Fatalf("Failed to load settings service: %v", err)
+	}
+
+	// ── Initialize storage ────────────────────────────────────
+	// All runtime uploads live under STORAGE_PATH, outside the Git repository.
+	storageService, err := services.NewStorageService(cfg.StoragePath, settingsService)
+	if err != nil {
+		log.Fatalf("Failed to initialize storage service: %v", err)
 	}
 
 	// ── Seed sample event if events table is empty ────────────
@@ -82,7 +88,7 @@ func main() {
 	})
 
 	// ── Register all routes ───────────────────────────────────
-	routes.Register(app, db, storageService, cfg.AdminUsername, cfg.AdminPassword, store, cfg.SessionSecret)
+	routes.Register(app, db, storageService, cfg.AdminUsername, cfg.AdminPassword, store, cfg.SessionSecret, settingsService)
 
 	// ── Start server ──────────────────────────────────────────
 	addr := ":" + cfg.AppPort

@@ -11,44 +11,57 @@ import (
 )
 
 // StorageService handles file saving and path resolution for runtime storage.
-// All paths are derived from the configured root directory.
+// All paths are derived from the configured root directory dynamically.
 type StorageService struct {
-	rootPath     string
-	paymentsPath string
-	eventsPath   string
-	tempPath     string
+	settingsService *SettingsService
+	defaultRootPath string
 }
 
 // NewStorageService creates and initializes a StorageService.
 // It automatically creates payments/, events/, and temp/ subdirectories.
-func NewStorageService(rootPath string) (*StorageService, error) {
+func NewStorageService(rootPath string, settingsService *SettingsService) (*StorageService, error) {
 	if rootPath == "" {
 		rootPath = "/storage"
 	}
 
 	s := &StorageService{
-		rootPath:     rootPath,
-		paymentsPath: filepath.Join(rootPath, "payments"),
-		eventsPath:   filepath.Join(rootPath, "events"),
-		tempPath:     filepath.Join(rootPath, "temp"),
+		settingsService: settingsService,
+		defaultRootPath: rootPath,
 	}
 
 	// Create directories if they do not exist
-	dirs := []string{s.paymentsPath, s.eventsPath, s.tempPath}
-	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
-		}
+	if err := s.ensureDirs(s.GetRootPath()); err != nil {
+		return nil, err
 	}
 
 	return s, nil
 }
 
+// ensureDirs ensures subdirectories exist under the specified root path.
+func (s *StorageService) ensureDirs(root string) error {
+	dirs := []string{
+		filepath.Join(root, "payments"),
+		filepath.Join(root, "events"),
+		filepath.Join(root, "temp"),
+	}
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", dir, err)
+		}
+	}
+	return nil
+}
+
 // SavePaymentProof saves a payment proof file to the payments storage path and returns the generated filename.
 func (s *StorageService) SavePaymentProof(file *multipart.FileHeader) (string, error) {
+	root := s.GetRootPath()
+	if err := s.ensureDirs(root); err != nil {
+		return "", err
+	}
+
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 	filename := fmt.Sprintf("payment_%d%s", time.Now().UnixNano(), ext)
-	fullPath := filepath.Join(s.paymentsPath, filename)
+	fullPath := filepath.Join(root, "payments", filename)
 
 	src, err := file.Open()
 	if err != nil {
@@ -71,9 +84,14 @@ func (s *StorageService) SavePaymentProof(file *multipart.FileHeader) (string, e
 
 // SaveEventBanner saves an event banner file to the events storage path and returns the generated filename.
 func (s *StorageService) SaveEventBanner(file *multipart.FileHeader) (string, error) {
+	root := s.GetRootPath()
+	if err := s.ensureDirs(root); err != nil {
+		return "", err
+	}
+
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 	filename := fmt.Sprintf("banner_%d%s", time.Now().UnixNano(), ext)
-	fullPath := filepath.Join(s.eventsPath, filename)
+	fullPath := filepath.Join(root, "events", filename)
 
 	src, err := file.Open()
 	if err != nil {
@@ -96,20 +114,25 @@ func (s *StorageService) SaveEventBanner(file *multipart.FileHeader) (string, er
 
 // GetPaymentsPath returns the path to the payments directory.
 func (s *StorageService) GetPaymentsPath() string {
-	return s.paymentsPath
+	return filepath.Join(s.GetRootPath(), "payments")
 }
 
 // GetEventsPath returns the path to the events directory.
 func (s *StorageService) GetEventsPath() string {
-	return s.eventsPath
+	return filepath.Join(s.GetRootPath(), "events")
 }
 
 // GetTempPath returns the path to the temp directory.
 func (s *StorageService) GetTempPath() string {
-	return s.tempPath
+	return filepath.Join(s.GetRootPath(), "temp")
 }
 
-// GetRootPath returns the root storage path.
+// GetRootPath returns the root storage path dynamically.
 func (s *StorageService) GetRootPath() string {
-	return s.rootPath
+	if s.settingsService != nil {
+		if path := s.settingsService.Get("storage_path"); path != "" {
+			return path
+		}
+	}
+	return s.defaultRootPath
 }

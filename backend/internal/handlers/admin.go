@@ -151,14 +151,22 @@ type AdminAdminEditData struct {
 }
 
 type AdminSettingsData struct {
-	AdminUser      string
-	AdminRole      string
-	PlatformName   string
-	Maintenance    bool
-	MaxUploadSize  string
-	SuccessMessage string
-	Errors         []string
-	Stats          *services.ParticipantStats
+	AdminUser           string
+	AdminRole           string
+	SiteName            string
+	SiteDescription     string
+	FooterText          string
+	RegistrationEnabled bool
+	MaintenanceMode     bool
+	SupportName         string
+	SupportWhatsApp     string
+	SupportEmail        string
+	WhatsAppEnabled     bool
+	NotificationEnabled bool
+	StoragePath         string
+	SuccessMessage      string
+	Errors              []string
+	Stats               *services.ParticipantStats
 }
 
 // ─────────────────────── Handler ───────────────────────
@@ -173,6 +181,7 @@ type AdminHandler struct {
 	notificationService *services.NotificationService
 	auditLogService     *services.AuditLogService
 	checkinService      *services.CheckinService
+	settingsService     *services.SettingsService
 	tmpl                *template.Template
 }
 
@@ -186,8 +195,16 @@ func NewAdminHandler(
 	notificationService *services.NotificationService,
 	auditLogService *services.AuditLogService,
 	checkinService *services.CheckinService,
+	settingsService *services.SettingsService,
 ) (*AdminHandler, error) {
 	funcMap := buildAdminFuncMap()
+	funcMap["setting"] = func(key string) string {
+		return settingsService.Get(key)
+	}
+	funcMap["settingBool"] = func(key string) bool {
+		return settingsService.GetBool(key)
+	}
+
 	t, err := template.New("").Funcs(funcMap).ParseFS(
 		templ.Files,
 		"admin_login.html",
@@ -218,6 +235,7 @@ func NewAdminHandler(
 		notificationService: notificationService,
 		auditLogService:     auditLogService,
 		checkinService:      checkinService,
+		settingsService:     settingsService,
 		tmpl:                t,
 	}, nil
 }
@@ -1684,14 +1702,21 @@ func (h *AdminHandler) SystemSettingsPage(c *fiber.Ctx) error {
 	adminRole, _ := c.Locals("admin_role").(string)
 	stats, _ := h.participantService.GetStats()
 
-	// Default/Mock settings
 	return h.render(c, "admin_settings.html", AdminSettingsData{
-		AdminUser:     adminUser,
-		AdminRole:     adminRole,
-		PlatformName:  "GatherHub",
-		Maintenance:   false,
-		MaxUploadSize: "10 MB",
-		Stats:         stats,
+		AdminUser:           adminUser,
+		AdminRole:           adminRole,
+		SiteName:            h.settingsService.Get("site_name"),
+		SiteDescription:     h.settingsService.Get("site_description"),
+		FooterText:          h.settingsService.Get("footer_text"),
+		RegistrationEnabled: h.settingsService.GetBool("registration_enabled"),
+		MaintenanceMode:     h.settingsService.GetBool("maintenance_mode"),
+		SupportName:         h.settingsService.Get("support_name"),
+		SupportWhatsApp:     h.settingsService.Get("support_whatsapp"),
+		SupportEmail:        h.settingsService.Get("support_email"),
+		WhatsAppEnabled:     h.settingsService.GetBool("whatsapp_enabled"),
+		NotificationEnabled: h.settingsService.GetBool("notification_enabled"),
+		StoragePath:         h.settingsService.Get("storage_path"),
+		Stats:               stats,
 	})
 }
 
@@ -1701,40 +1726,131 @@ func (h *AdminHandler) SystemSettingsSubmit(c *fiber.Ctx) error {
 	adminRole, _ := c.Locals("admin_role").(string)
 	stats, _ := h.participantService.GetStats()
 
-	platformName := strings.TrimSpace(c.FormValue("platform_name"))
-	maintenance := c.FormValue("maintenance") == "true"
-	maxUploadSize := strings.TrimSpace(c.FormValue("max_upload_size"))
+	// Parse inputs
+	siteName := strings.TrimSpace(c.FormValue("site_name"))
+	siteDescription := strings.TrimSpace(c.FormValue("site_description"))
+	footerText := strings.TrimSpace(c.FormValue("footer_text"))
+	registrationEnabled := c.FormValue("registration_enabled") == "true"
+	maintenanceMode := c.FormValue("maintenance_mode") == "true"
+	supportName := strings.TrimSpace(c.FormValue("support_name"))
+	supportWhatsApp := strings.TrimSpace(c.FormValue("support_whatsapp"))
+	supportEmail := strings.TrimSpace(c.FormValue("support_email"))
+	whatsAppEnabled := c.FormValue("whatsapp_enabled") == "true"
+	notificationEnabled := c.FormValue("notification_enabled") == "true"
+	storagePath := strings.TrimSpace(c.FormValue("storage_path"))
 
 	var errs []string
-	if platformName == "" {
-		errs = append(errs, "Nama Platform wajib diisi")
+	if siteName == "" {
+		errs = append(errs, "Nama Situs wajib diisi")
 	}
-	if maxUploadSize == "" {
-		errs = append(errs, "Maksimum Upload wajib diisi")
+	if footerText == "" {
+		errs = append(errs, "Teks Footer wajib diisi")
+	}
+	if supportName == "" {
+		errs = append(errs, "Nama Support wajib diisi")
+	}
+	if supportWhatsApp == "" {
+		errs = append(errs, "WhatsApp Support wajib diisi")
+	}
+	if supportEmail == "" {
+		errs = append(errs, "Email Support wajib diisi")
+	}
+	if storagePath == "" {
+		errs = append(errs, "Path Penyimpanan wajib diisi")
 	}
 
 	if len(errs) > 0 {
 		return h.render(c, "admin_settings.html", AdminSettingsData{
-			AdminUser:     adminUser,
-			AdminRole:     adminRole,
-			PlatformName:  platformName,
-			Maintenance:   maintenance,
-			MaxUploadSize: maxUploadSize,
-			Errors:        errs,
-			Stats:         stats,
+			AdminUser:           adminUser,
+			AdminRole:           adminRole,
+			SiteName:            siteName,
+			SiteDescription:     siteDescription,
+			FooterText:          footerText,
+			RegistrationEnabled: registrationEnabled,
+			MaintenanceMode:     maintenanceMode,
+			SupportName:         supportName,
+			SupportWhatsApp:     supportWhatsApp,
+			SupportEmail:        supportEmail,
+			WhatsAppEnabled:     whatsAppEnabled,
+			NotificationEnabled: notificationEnabled,
+			StoragePath:         storagePath,
+			Errors:              errs,
+			Stats:               stats,
 		})
 	}
 
-	log.Printf("System settings updated by %s: Platform=%s, Maintenance=%v, MaxUpload=%s", adminUser, platformName, maintenance, maxUploadSize)
+	// Capture old values for audit logging
+	oldSettings := map[string]string{
+		"site_name":            h.settingsService.Get("site_name"),
+		"site_description":     h.settingsService.Get("site_description"),
+		"footer_text":          h.settingsService.Get("footer_text"),
+		"registration_enabled": h.settingsService.Get("registration_enabled"),
+		"maintenance_mode":     h.settingsService.Get("maintenance_mode"),
+		"support_name":         h.settingsService.Get("support_name"),
+		"support_whatsapp":     h.settingsService.Get("support_whatsapp"),
+		"support_email":        h.settingsService.Get("support_email"),
+		"whatsapp_enabled":     h.settingsService.Get("whatsapp_enabled"),
+		"notification_enabled": h.settingsService.Get("notification_enabled"),
+		"storage_path":         h.settingsService.Get("storage_path"),
+	}
+
+	newSettings := map[string]string{
+		"site_name":            siteName,
+		"site_description":     siteDescription,
+		"footer_text":          footerText,
+		"registration_enabled": strconv.FormatBool(registrationEnabled),
+		"maintenance_mode":     strconv.FormatBool(maintenanceMode),
+		"support_name":         supportName,
+		"support_whatsapp":     supportWhatsApp,
+		"support_email":        supportEmail,
+		"whatsapp_enabled":     strconv.FormatBool(whatsAppEnabled),
+		"notification_enabled": strconv.FormatBool(notificationEnabled),
+		"storage_path":         storagePath,
+	}
+
+	if err := h.settingsService.UpdateMany(newSettings); err != nil {
+		return h.render(c, "admin_settings.html", AdminSettingsData{
+			AdminUser:           adminUser,
+			AdminRole:           adminRole,
+			SiteName:            siteName,
+			SiteDescription:     siteDescription,
+			FooterText:          footerText,
+			RegistrationEnabled: registrationEnabled,
+			MaintenanceMode:     maintenanceMode,
+			SupportName:         supportName,
+			SupportWhatsApp:     supportWhatsApp,
+			SupportEmail:        supportEmail,
+			WhatsAppEnabled:     whatsAppEnabled,
+			NotificationEnabled: notificationEnabled,
+			StoragePath:         storagePath,
+			Errors:              []string{"Gagal menyimpan pengaturan: " + err.Error()},
+			Stats:               stats,
+		})
+	}
+
+	// Write audit log entry
+	ip := c.IP()
+	ua := c.Get("User-Agent")
+	if err := h.auditLogService.Log(adminUser, "UPDATE", "Setting", 0, oldSettings, newSettings, ip, ua); err != nil {
+		log.Printf("Warning: failed to log settings update: %v", err)
+	}
 
 	return h.render(c, "admin_settings.html", AdminSettingsData{
-		AdminUser:      adminUser,
-		AdminRole:      adminRole,
-		PlatformName:   platformName,
-		Maintenance:    maintenance,
-		MaxUploadSize:  maxUploadSize,
-		SuccessMessage: "Pengaturan sistem berhasil disimpan!",
-		Stats:          stats,
+		AdminUser:           adminUser,
+		AdminRole:           adminRole,
+		SiteName:            siteName,
+		SiteDescription:     siteDescription,
+		FooterText:          footerText,
+		RegistrationEnabled: registrationEnabled,
+		MaintenanceMode:     maintenanceMode,
+		SupportName:         supportName,
+		SupportWhatsApp:     supportWhatsApp,
+		SupportEmail:        supportEmail,
+		WhatsAppEnabled:     whatsAppEnabled,
+		NotificationEnabled: notificationEnabled,
+		StoragePath:         storagePath,
+		SuccessMessage:      "Pengaturan sistem berhasil disimpan!",
+		Stats:               stats,
 	})
 }
 

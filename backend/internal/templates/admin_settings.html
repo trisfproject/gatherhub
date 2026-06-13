@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Pengaturan Sistem — GatherHub Admin</title>
+  <title>Pengaturan Sistem — {{setting "site_name"}} Admin</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
@@ -39,7 +39,7 @@
         </svg>
       </div>
       <div>
-        <p class="font-bold text-sm text-white">GatherHub</p>
+        <p class="font-bold text-sm text-white">{{setting "site_name"}}</p>
         <p class="text-xs text-white/30 font-medium">Panel Admin</p>
       </div>
     </div>
@@ -116,11 +116,11 @@
   <div class="topbar">
     <div>
       <h2 class="text-base font-bold text-white">Pengaturan Sistem</h2>
-      <p class="text-xs text-white/30">Konfigurasi global platform GatherHub</p>
+      <p class="text-xs text-white/30">Konfigurasi global platform {{setting "site_name"}}</p>
     </div>
   </div>
 
-  <div class="p-6 max-w-2xl">
+  <div class="p-6 max-w-3xl">
     {{if .Errors}}
     <div class="mb-6 bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-sm font-semibold">
       <p class="font-bold mb-2">Mohon perbaiki kesalahan berikut:</p>
@@ -140,31 +140,124 @@
     {{end}}
 
     <div class="glass p-6 fade-up">
-      <form action="/admin/settings" method="POST" class="space-y-6">
+      <form action="/admin/settings" method="POST" class="space-y-8">
+        
+        <!-- General Category -->
         <div>
-          <label for="platform_name" class="form-label">Nama Platform</label>
-          <input type="text" id="platform_name" name="platform_name" class="form-input" placeholder="Masukkan nama platform" value="{{.PlatformName}}" required/>
-        </div>
-
-        <div>
-          <label for="max_upload_size" class="form-label">Maksimum Batas Upload File (Pembayaran & Banner)</label>
-          <input type="text" id="max_upload_size" name="max_upload_size" class="form-input" placeholder="contoh: 10 MB" value="{{.MaxUploadSize}}" required/>
-        </div>
-
-        <div>
-          <label class="form-label">Mode Pemeliharaan (Maintenance Mode)</label>
-          <div class="flex items-center gap-4 mt-2">
-            <label class="inline-flex items-center gap-2 cursor-pointer">
-              <input type="radio" name="maintenance" value="false" class="text-indigo-600 focus:ring-indigo-500 bg-white/5 border-white/10" {{if not .Maintenance}}checked{{end}}/>
-              <span class="text-sm text-white/80">Non-Aktif (Sistem Berjalan Normal)</span>
-            </label>
-            <label class="inline-flex items-center gap-2 cursor-pointer">
-              <input type="radio" name="maintenance" value="true" class="text-indigo-600 focus:ring-indigo-500 bg-white/5 border-white/10" {{if .Maintenance}}checked{{end}}/>
-              <span class="text-sm text-white/80">Aktif (Mode Pemeliharaan)</span>
-            </label>
+          <h3 class="text-indigo-400 font-bold text-sm border-b border-white/5 pb-2 mb-4">Pengaturan Umum (General)</h3>
+          <div class="space-y-4">
+            <div>
+              <label for="site_name" class="form-label">Nama Situs / Platform</label>
+              <input type="text" id="site_name" name="site_name" class="form-input" placeholder="Masukkan nama situs" value="{{.SiteName}}" required/>
+            </div>
+            <div>
+              <label for="site_description" class="form-label">Deskripsi Situs</label>
+              <input type="text" id="site_description" name="site_description" class="form-input" placeholder="Masukkan deskripsi singkat situs" value="{{.SiteDescription}}"/>
+            </div>
+            <div>
+              <label for="footer_text" class="form-label">Teks Hak Cipta / Footer</label>
+              <input type="text" id="footer_text" name="footer_text" class="form-input" placeholder="Masukkan hak cipta footer" value="{{.FooterText}}" required/>
+            </div>
           </div>
         </div>
 
+        <!-- Registration Category -->
+        <div>
+          <h3 class="text-indigo-400 font-bold text-sm border-b border-white/5 pb-2 mb-4">Pengaturan Pendaftaran & Pemeliharaan</h3>
+          <div class="space-y-6">
+            <div>
+              <label class="form-label">Status Pendaftaran (Registration Enabled)</label>
+              <div class="flex items-center gap-6 mt-2">
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="registration_enabled" value="true" class="text-indigo-600 focus:ring-indigo-500 bg-white/5 border-white/10" {{if .RegistrationEnabled}}checked{{end}}/>
+                  <span class="text-sm text-white/80">Aktif (Pendaftaran Dibuka)</span>
+                </label>
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="registration_enabled" value="false" class="text-indigo-600 focus:ring-indigo-500 bg-white/5 border-white/10" {{if not .RegistrationEnabled}}checked{{end}}/>
+                  <span class="text-sm text-white/80">Non-Aktif (Pendaftaran Ditutup)</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label class="form-label">Mode Pemeliharaan (Maintenance Mode)</label>
+              <div class="flex items-center gap-6 mt-2">
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="maintenance_mode" value="false" class="text-indigo-600 focus:ring-indigo-500 bg-white/5 border-white/10" {{if not .MaintenanceMode}}checked{{end}}/>
+                  <span class="text-sm text-white/80">Non-Aktif (Sistem Berjalan Normal)</span>
+                </label>
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="maintenance_mode" value="true" class="text-indigo-600 focus:ring-indigo-500 bg-white/5 border-white/10" {{if .MaintenanceMode}}checked{{end}}/>
+                  <span class="text-sm text-white/80">Aktif (Mode Pemeliharaan)</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact Category -->
+        <div>
+          <h3 class="text-indigo-400 font-bold text-sm border-b border-white/5 pb-2 mb-4">Kontak Dukungan (Contact)</h3>
+          <div class="space-y-4">
+            <div>
+              <label for="support_name" class="form-label">Nama Kontak Dukungan</label>
+              <input type="text" id="support_name" name="support_name" class="form-input" placeholder="Masukkan nama kontak dukungan" value="{{.SupportName}}" required/>
+            </div>
+            <div>
+              <label for="support_whatsapp" class="form-label">Nomor WhatsApp Dukungan</label>
+              <input type="text" id="support_whatsapp" name="support_whatsapp" class="form-input" placeholder="contoh: 6281234567890" value="{{.SupportWhatsApp}}" required/>
+            </div>
+            <div>
+              <label for="support_email" class="form-label">Email Dukungan</label>
+              <input type="email" id="support_email" name="support_email" class="form-input" placeholder="contoh: support@situs.com" value="{{.SupportEmail}}" required/>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notification Category -->
+        <div>
+          <h3 class="text-indigo-400 font-bold text-sm border-b border-white/5 pb-2 mb-4">Sistem Notifikasi (Notification)</h3>
+          <div class="space-y-6">
+            <div>
+              <label class="form-label">Notifikasi Global (Notification Enabled)</label>
+              <div class="flex items-center gap-6 mt-2">
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="notification_enabled" value="true" class="text-indigo-600 focus:ring-indigo-500 bg-white/5 border-white/10" {{if .NotificationEnabled}}checked{{end}}/>
+                  <span class="text-sm text-white/80">Aktif (Kirim Notifikasi)</span>
+                </label>
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="notification_enabled" value="false" class="text-indigo-600 focus:ring-indigo-500 bg-white/5 border-white/10" {{if not .NotificationEnabled}}checked{{end}}/>
+                  <span class="text-sm text-white/80">Non-Aktif (Hentikan Semua Notifikasi)</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label class="form-label">Notifikasi WhatsApp (WhatsApp Enabled)</label>
+              <div class="flex items-center gap-6 mt-2">
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="whatsapp_enabled" value="true" class="text-indigo-600 focus:ring-indigo-500 bg-white/5 border-white/10" {{if .WhatsAppEnabled}}checked{{end}}/>
+                  <span class="text-sm text-white/80">Aktif (Kirim Notifikasi WhatsApp)</span>
+                </label>
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="whatsapp_enabled" value="false" class="text-indigo-600 focus:ring-indigo-500 bg-white/5 border-white/10" {{if not .WhatsAppEnabled}}checked{{end}}/>
+                  <span class="text-sm text-white/80">Non-Aktif (Matikan Notifikasi WhatsApp)</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Storage Category -->
+        <div>
+          <h3 class="text-indigo-400 font-bold text-sm border-b border-white/5 pb-2 mb-4">Penyimpanan Media (Storage)</h3>
+          <div>
+            <label for="storage_path" class="form-label">Path Penyimpanan Utama (Storage Path)</label>
+            <input type="text" id="storage_path" name="storage_path" class="form-input" placeholder="contoh: /storage" value="{{.StoragePath}}" required/>
+          </div>
+        </div>
+
+        <!-- Form Action -->
         <div class="pt-4 border-t border-white/7 flex justify-end">
           <button type="submit"
                   class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition-colors">

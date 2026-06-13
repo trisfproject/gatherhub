@@ -23,14 +23,16 @@ type NotificationService struct {
 	db              *gorm.DB
 	providers       map[string]NotificationProvider
 	auditLogService *AuditLogService
+	settingsService *SettingsService
 }
 
 // NewNotificationService creates a new NotificationService
-func NewNotificationService(db *gorm.DB, auditLog *AuditLogService) *NotificationService {
+func NewNotificationService(db *gorm.DB, auditLog *AuditLogService, settingsService *SettingsService) *NotificationService {
 	mock := NewMockProvider(db, auditLog)
 	return &NotificationService{
 		db:              db,
 		auditLogService: auditLog,
+		settingsService: settingsService,
 		providers: map[string]NotificationProvider{
 			"whatsapp": mock,
 			"email":    mock,
@@ -81,12 +83,21 @@ func (s *NotificationService) SendNotification(p *models.Participant, eventType 
 
 	// Dispatch to active channels asynchronously
 	go func() {
+		if s.settingsService != nil && !s.settingsService.GetBool("notification_enabled") {
+			log.Println("Notifications are globally disabled in settings.")
+			return
+		}
+
 		// WhatsApp
 		if p.Phone != "" {
-			if prov, ok := s.providers["whatsapp"]; ok {
-				if err := prov.Send(p.Phone, message); err != nil {
-					log.Printf("Failed to send WhatsApp notif to %s: %v", p.Phone, err)
+			if s.settingsService == nil || s.settingsService.GetBool("whatsapp_enabled") {
+				if prov, ok := s.providers["whatsapp"]; ok {
+					if err := prov.Send(p.Phone, message); err != nil {
+						log.Printf("Failed to send WhatsApp notif to %s: %v", p.Phone, err)
+					}
 				}
+			} else {
+				log.Println("WhatsApp notifications are disabled in settings.")
 			}
 		}
 

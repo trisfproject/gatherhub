@@ -49,6 +49,7 @@ type PageHandler struct {
 	participantService  *services.ParticipantService
 	notificationService *services.NotificationService
 	checkinService      *services.CheckinService
+	settingsService     *services.SettingsService
 	tmpl                *template.Template
 }
 
@@ -58,9 +59,17 @@ func NewPageHandler(
 	participantService *services.ParticipantService,
 	notificationService *services.NotificationService,
 	checkinService *services.CheckinService,
+	settingsService *services.SettingsService,
 ) (*PageHandler, error) {
 	funcMap := buildFuncMap()
-	t, err := template.New("").Funcs(funcMap).ParseFS(templ.Files, "landing.html", "register.html", "success.html", "event_public.html", "checkin.html")
+	funcMap["setting"] = func(key string) string {
+		return settingsService.Get(key)
+	}
+	funcMap["settingBool"] = func(key string) bool {
+		return settingsService.GetBool(key)
+	}
+
+	t, err := template.New("").Funcs(funcMap).ParseFS(templ.Files, "landing.html", "register.html", "success.html", "event_public.html", "checkin.html", "maintenance.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse templates: %w", err)
 	}
@@ -69,6 +78,7 @@ func NewPageHandler(
 		participantService:  participantService,
 		notificationService: notificationService,
 		checkinService:      checkinService,
+		settingsService:     settingsService,
 		tmpl:                t,
 	}, nil
 }
@@ -86,6 +96,11 @@ func (h *PageHandler) Landing(c *fiber.Ctx) error {
 
 // RegisterPage handles GET /register — registration form
 func (h *PageHandler) RegisterPage(c *fiber.Ctx) error {
+	// Guard: check if registration is globally enabled in settings
+	if !h.settingsService.GetBool("registration_enabled") {
+		return h.renderError(c, "Pendaftaran peserta sedang ditutup sementara oleh administrator.", "/")
+	}
+
 	event, err := h.eventService.GetFirst()
 	if err != nil {
 		return h.renderError(c, "Tidak ada acara yang membuka pendaftaran saat ini.", "/")
@@ -112,6 +127,11 @@ func (h *PageHandler) EventBySlug(c *fiber.Ctx) error {
 
 // RegisterSubmit handles POST /register — process form submission
 func (h *PageHandler) RegisterSubmit(c *fiber.Ctx) error {
+	// Guard: check if registration is globally enabled in settings
+	if !h.settingsService.GetBool("registration_enabled") {
+		return h.renderError(c, "Pendaftaran peserta sedang ditutup sementara oleh administrator.", "/")
+	}
+
 	event, err := h.eventService.GetFirst()
 	if err != nil {
 		return c.Redirect("/", fiber.StatusSeeOther)
@@ -438,3 +458,10 @@ func buildFuncMap() template.FuncMap {
 		},
 	}
 }
+
+// RenderMaintenance renders the maintenance.html template.
+func (h *PageHandler) RenderMaintenance(c *fiber.Ctx) error {
+	c.Status(fiber.StatusServiceUnavailable) // HTTP 503
+	return h.render(c, "maintenance.html", nil)
+}
+

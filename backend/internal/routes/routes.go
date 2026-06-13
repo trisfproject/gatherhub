@@ -2,6 +2,7 @@ package routes
 
 import (
 	"log"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/session"
@@ -13,13 +14,13 @@ import (
 
 // Register sets up all application routes.
 // storage holds the resolved paths for all upload directories.
-func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageService, adminUsername, adminPassword string, store *session.Store, sessionSecret string) {
+func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageService, adminUsername, adminPassword string, store *session.Store, sessionSecret string, settingsService *services.SettingsService) {
 	// ── Services ──────────────────────────────────────────────
 	auditLogService := services.NewAuditLogService(db)
 	checkinService := services.NewCheckinService(db, sessionSecret)
 	eventService := services.NewEventService(db)
 	participantService := services.NewParticipantService(db, storageService)
-	notificationService := services.NewNotificationService(db, auditLogService)
+	notificationService := services.NewNotificationService(db, auditLogService, settingsService)
 
 	adminService := services.NewAdminService(db)
 	if err := adminService.SeedDefaultAdmin(); err != nil {
@@ -29,15 +30,32 @@ func Register(app *fiber.App, db *gorm.DB, storageService *services.StorageServi
 	// ── Handlers ──────────────────────────────────────────────
 	healthHandler := handlers.NewHealthHandler(db)
 
-	pageHandler, err := handlers.NewPageHandler(eventService, participantService, notificationService, checkinService)
+	pageHandler, err := handlers.NewPageHandler(eventService, participantService, notificationService, checkinService, settingsService)
 	if err != nil {
 		log.Fatalf("Failed to initialise page handler: %v", err)
 	}
 
-	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storageService, notificationService, auditLogService, checkinService)
+	adminHandler, err := handlers.NewAdminHandler(participantService, eventService, store, adminService, storageService, notificationService, auditLogService, checkinService, settingsService)
 	if err != nil {
 		log.Fatalf("Failed to initialise admin handler: %v", err)
 	}
+
+	// ── Maintenance Interceptor ───────────────────────────────
+	app.Use(func(c *fiber.Ctx) error {
+		path := c.Path()
+		// Allow admin routes, static assets, and health check to pass through
+		if strings.HasPrefix(path, "/admin") ||
+			strings.HasPrefix(path, "/payments") ||
+			strings.HasPrefix(path, "/events") ||
+			path == "/health" {
+			return c.Next()
+		}
+
+		if settingsService.GetBool("maintenance_mode") {
+			return pageHandler.RenderMaintenance(c)
+		}
+		return c.Next()
+	})
 
 	// ── Public Page Routes (SSR) ───────────────────────────────
 	app.Get("/", pageHandler.Landing)

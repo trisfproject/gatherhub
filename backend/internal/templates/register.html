@@ -81,7 +81,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
       </div>
-      <span class="font-bold text-lg tracking-tight">GatherHub</span>
+      <span class="font-bold text-lg tracking-tight">{{setting "site_name"}}</span>
     </a>
     <a href="/" class="flex items-center gap-1.5 text-sm text-white/60 hover:text-white transition-colors">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -423,7 +423,7 @@
 
 <footer class="border-t border-white/8 py-8">
   <div class="max-w-5xl mx-auto px-5 text-center">
-    <p class="text-white/25 text-sm">© {{now | formatYear}} GatherHub · Crafted by <a href="https://trisf.my.id/" target="_blank" rel="noopener noreferrer" class="text-inherit hover:text-white/50 transition-colors duration-200">trisf</a></p>
+    <p class="text-white/25 text-sm">{{setting "footer_text"}}</p>
   </div>
 </footer>
 

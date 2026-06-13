@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>{{.Event.Title}} — GatherHub</title>
+  <title>{{.Event.Title}} — {{setting "site_name"}}</title>
   <meta name="description" content="{{.Event.Description | truncate 160}}"/>
   <meta property="og:title" content="{{.Event.Title}}"/>
   <meta property="og:type" content="website"/>
@@ -88,7 +88,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
       </div>
-      <span class="font-bold text-lg tracking-tight">GatherHub</span>
+      <span class="font-bold text-lg tracking-tight">{{setting "site_name"}}</span>
     </a>
     <a href="/register"
        class="btn-cta text-sm font-semibold px-5 py-2 rounded-xl text-white">
@@ -311,9 +311,9 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
       </div>
-      <span class="font-bold text-white">GatherHub</span>
+      <span class="font-bold text-white">{{setting "site_name"}}</span>
     </div>
-    <p class="text-white/30 text-sm">© {{now | formatYear}} GatherHub · Crafted by <a href="https://trisf.my.id/" target="_blank" rel="noopener noreferrer" class="text-inherit hover:text-white/50 transition-colors duration-200">trisf</a></p>
+    <p class="text-white/30 text-sm">{{setting "footer_text"}}</p>
   </div>
 </footer>
 
