@@ -53,12 +53,16 @@ type RegisterForm struct {
 // ParticipantStats holds dashboard counts by status
 type ParticipantStats struct {
 	Total          int64
-	Pending        int64
+	Pending        int64 // Alias for Registered
+	Registered     int64
+	Waitlist       int64
 	Verified       int64
 	Rejected       int64
 	CheckedIn      int64
 	VerifiedTotal  int64
 	AttendanceRate float64
+	Capacity       int64
+	RemainingSeats int64
 }
 
 var emailRegex = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
@@ -242,6 +246,27 @@ func (s *ParticipantService) generateRegistrationNumber() (string, error) {
 
 // Create registers a new participant for an event
 func (s *ParticipantService) Create(eventID uint, form *RegisterForm, paymentFilename string) (*models.Participant, error) {
+	var activeCount int64
+	if err := s.db.Model(&models.Participant{}).
+		Where("event_id = ? AND status IN ('REGISTERED', 'VERIFIED', 'CHECKED_IN', 'PENDING')", eventID).
+		Count(&activeCount).Error; err != nil {
+		return nil, fmt.Errorf("gagal menghitung jumlah peserta aktif: %w", err)
+	}
+
+	var event models.Event
+	if err := s.db.First(&event, eventID).Error; err != nil {
+		return nil, fmt.Errorf("gagal mendapatkan data acara: %w", err)
+	}
+
+	var initialStatus models.ParticipantStatus = models.StatusRegistered
+	if event.MaxParticipants > 0 && activeCount >= int64(event.MaxParticipants) {
+		if event.EnableWaitingList {
+			initialStatus = models.StatusWaitlist
+		} else {
+			return nil, fmt.Errorf("Pendaftaran sudah penuh")
+		}
+	}
+
 	regNumber, err := s.generateRegistrationNumber()
 	if err != nil {
 		return nil, err
@@ -267,7 +292,7 @@ func (s *ParticipantService) Create(eventID uint, form *RegisterForm, paymentFil
 		CarpoolCanBring:       form.CarpoolCanBring == "true",
 		TShirtSize:            strings.TrimSpace(form.TShirtSize),
 		PaymentProof:          paymentFilename,
-		Status:                models.StatusPending,
+		Status:                initialStatus,
 		TransportMeetingPoint: strings.TrimSpace(form.TransportMeetingPoint),
 		TransportNotes:        strings.TrimSpace(form.TransportNotes),
 	}
@@ -381,7 +406,13 @@ func (s *ParticipantService) GetStats() (*ParticipantStats, error) {
 		stats.Total += r.Count
 		switch r.Status {
 		case models.StatusPending:
-			stats.Pending = r.Count
+			stats.Pending += r.Count
+			stats.Registered += r.Count
+		case models.StatusRegistered:
+			stats.Registered += r.Count
+			stats.Pending += r.Count // Alias
+		case models.StatusWaitlist:
+			stats.Waitlist = r.Count
 		case models.StatusVerified:
 			stats.Verified = r.Count
 		case models.StatusRejected:
@@ -399,11 +430,12 @@ func (s *ParticipantService) GetStats() (*ParticipantStats, error) {
 	return stats, nil
 }
 
-// UpdateStatus changes a participant's status to VERIFIED or REJECTED
+// UpdateStatus changes a participant's status to VERIFIED, REJECTED or REGISTERED
 func (s *ParticipantService) UpdateStatus(id uint, status models.ParticipantStatus) (*models.Participant, error) {
 	allowed := map[models.ParticipantStatus]bool{
-		models.StatusVerified: true,
-		models.StatusRejected: true,
+		models.StatusVerified:   true,
+		models.StatusRejected:   true,
+		models.StatusRegistered: true,
 	}
 	if !allowed[status] {
 		return nil, fmt.Errorf("status target tidak valid: %s", status)
@@ -417,9 +449,15 @@ func (s *ParticipantService) UpdateStatus(id uint, status models.ParticipantStat
 		return nil, err
 	}
 
-	// Enforce rules: PENDING -> VERIFIED, PENDING -> REJECTED
-	if p.Status != models.StatusPending {
-		return nil, fmt.Errorf("hanya peserta dengan status PENDING yang dapat diubah statusnya (status saat ini: %s)", p.Status)
+	// Enforce rules: PENDING/REGISTERED -> VERIFIED/REJECTED, WAITLIST -> REGISTERED (Promotion)
+	if status == models.StatusVerified || status == models.StatusRejected {
+		if p.Status != models.StatusPending && p.Status != models.StatusRegistered {
+			return nil, fmt.Errorf("hanya peserta dengan status REGISTERED yang dapat diubah statusnya menjadi VERIFIED/REJECTED (status saat ini: %s)", p.Status)
+		}
+	} else if status == models.StatusRegistered {
+		if p.Status != models.StatusWaitlist {
+			return nil, fmt.Errorf("hanya peserta dengan status WAITLIST yang dapat dipromosikan menjadi REGISTERED (status saat ini: %s)", p.Status)
+		}
 	}
 
 	p.Status = status
@@ -430,6 +468,9 @@ func (s *ParticipantService) UpdateStatus(id uint, status models.ParticipantStat
 	} else if status == models.StatusRejected {
 		p.RejectedAt = &now
 		p.VerifiedAt = nil
+	} else if status == models.StatusRegistered {
+		p.VerifiedAt = nil
+		p.RejectedAt = nil
 	}
 
 	if err := s.db.Save(&p).Error; err != nil {
@@ -495,13 +536,35 @@ func (s *ParticipantService) GetFilteredStats(eventID uint, startDate, endDate s
 		stats.Total += r.Count
 		switch r.Status {
 		case models.StatusPending:
-			stats.Pending = r.Count
+			stats.Pending += r.Count
+			stats.Registered += r.Count
+		case models.StatusRegistered:
+			stats.Registered += r.Count
+			stats.Pending += r.Count // Alias
+		case models.StatusWaitlist:
+			stats.Waitlist = r.Count
 		case models.StatusVerified:
 			stats.Verified = r.Count
 		case models.StatusRejected:
 			stats.Rejected = r.Count
 		case models.StatusCheckedIn:
 			stats.CheckedIn = r.Count
+		}
+	}
+
+	if eventID > 0 {
+		var event models.Event
+		if err := s.db.First(&event, eventID).Error; err == nil {
+			stats.Capacity = int64(event.MaxParticipants)
+			if stats.Capacity > 0 {
+				seatsTaken := stats.Registered + stats.Verified + stats.CheckedIn + stats.Pending
+				stats.RemainingSeats = stats.Capacity - seatsTaken
+				if stats.RemainingSeats < 0 {
+					stats.RemainingSeats = 0
+				}
+			} else {
+				stats.RemainingSeats = -1 // Unlimited
+			}
 		}
 	}
 
@@ -540,7 +603,13 @@ func (s *ParticipantService) GetAttendanceStats(eventID uint, date string) (*Par
 		stats.Total += r.Count
 		switch r.Status {
 		case models.StatusPending:
-			stats.Pending = r.Count
+			stats.Pending += r.Count
+			stats.Registered += r.Count
+		case models.StatusRegistered:
+			stats.Registered += r.Count
+			stats.Pending += r.Count // Alias
+		case models.StatusWaitlist:
+			stats.Waitlist = r.Count
 		case models.StatusVerified:
 			stats.Verified = r.Count
 		case models.StatusRejected:
@@ -670,4 +739,13 @@ func (s *ParticipantService) GetLatestVerifications(eventID uint, limit int) ([]
 // GetDB returns the database client instance
 func (s *ParticipantService) GetDB() *gorm.DB {
 	return s.db
+}
+
+// GetWaitlistPosition returns the 1-based index position of a waitlisted participant
+func (s *ParticipantService) GetWaitlistPosition(eventID uint, participantID uint) (int64, error) {
+	var count int64
+	err := s.db.Model(&models.Participant{}).
+		Where("event_id = ? AND status = ? AND id <= ?", eventID, models.StatusWaitlist, participantID).
+		Count(&count).Error
+	return count, err
 }

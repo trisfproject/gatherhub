@@ -109,11 +109,19 @@
 
     <!-- ── Main Success Message ── -->
     <div class="text-center anim-1 mb-8">
+      {{if eq (printf "%s" .Participant.Status) "WAITLIST"}}
+      <h1 class="text-4xl font-extrabold mb-2 font-sans text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-400">Daftar Tunggu! ⏳</h1>
+      <p class="text-white/60 text-lg">
+        Halo, <strong class="text-white font-bold">{{.Participant.FullName}}</strong>!
+      </p>
+      <p class="text-white/50 mt-1">You have been placed on the waiting list.</p>
+      {{else}}
       <h1 class="text-4xl font-extrabold mb-2">Pendaftaran Berhasil! 🎉</h1>
       <p class="text-white/60 text-lg">
         Halo, <strong class="text-white font-bold">{{.Participant.FullName}}</strong>!
       </p>
       <p class="text-white/50 mt-1">Pendaftaran Anda untuk <strong class="text-white/70">{{.Event.Title}}</strong> telah diterima.</p>
+      {{end}}
     </div>
 
     <!-- ── Registration Number ── -->
@@ -129,18 +137,37 @@
     <div class="bg-card-solid rounded-2xl p-6 anim-3 mb-6">
       <div class="flex items-center justify-between mb-5">
         <p class="text-white/50 text-sm font-semibold">Status Pendaftaran</p>
-        <span class="status-pending">
-          <span class="w-2 h-2 bg-amber-400 rounded-full pulse-slow"></span>
-          Pending Verification
+        {{if eq (printf "%s" .Participant.Status) "WAITLIST"}}
+        <span class="inline-flex items-center gap-2 bg-blue-500/15 border border-blue-500/35 text-blue-300 rounded-full py-1 px-3.5 text-xs font-bold">
+          <span class="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></span>
+          Waitlist
         </span>
+        {{else}}
+        <span class="inline-flex items-center gap-2 bg-amber-500/15 border border-amber-500/35 text-amber-300 rounded-full py-1 px-3.5 text-xs font-bold">
+          <span class="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse"></span>
+          Registered
+        </span>
+        {{end}}
       </div>
 
       <!-- Message -->
+      {{if eq (printf "%s" .Participant.Status) "WAITLIST"}}
+      <div class="bg-blue-500/8 border border-blue-500/20 rounded-xl p-4 mb-5">
+        <p class="text-blue-200/80 text-sm leading-relaxed mb-3">
+          Kuota peserta untuk acara ini telah penuh. Pendaftaran Anda telah kami masukkan ke dalam daftar tunggu (waitlist) acara ini.
+        </p>
+        <div class="p-3 bg-white/4 rounded-xl text-center">
+          <p class="text-xxs uppercase tracking-widest text-blue-300 font-bold mb-0.5">Current Waiting List Position</p>
+          <p class="text-2xl font-extrabold text-white">#{{.WaitlistPosition}}</p>
+        </div>
+      </div>
+      {{else}}
       <div class="bg-amber-500/8 border border-amber-500/20 rounded-xl p-4 mb-5">
         <p class="text-amber-200/80 text-sm leading-relaxed">
           Data dan bukti pembayaran Anda telah kami terima dan sedang menunggu verifikasi admin.
         </p>
       </div>
+      {{end}}
 
       <!-- Participant details -->
       <div class="grid grid-cols-2 gap-3 text-sm">
@@ -180,6 +207,32 @@
             <p class="text-white/35 text-xs mt-0.5">Data dan bukti pembayaran berhasil diterima</p>
           </div>
         </div>
+        
+        {{if eq (printf "%s" .Participant.Status) "WAITLIST"}}
+        <!-- Step 2: Waitlist -->
+        <div class="timeline-step">
+          <div class="step-line"></div>
+          <div class="step-dot bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center">
+            <span class="w-2.5 h-2.5 bg-blue-400 rounded-full animate-pulse"></span>
+          </div>
+          <div class="pt-0.5">
+            <p class="text-blue-400 font-bold text-sm">Daftar Tunggu (Waitlist)</p>
+            <p class="text-white/35 text-xs mt-0.5">Menunggu slot peserta kosong atau persetujuan panitia</p>
+          </div>
+        </div>
+        <!-- Step 3: Verified -->
+        <div class="timeline-step">
+          <div class="step-dot step-dot-pending">
+            <svg class="w-4 h-4 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+          <div class="pt-0.5">
+            <p class="text-white/35 font-bold text-sm">Pendaftaran Disetujui</p>
+            <p class="text-white/25 text-xs mt-0.5">Anda akan dipromosikan saat kursi kosong tersedia</p>
+          </div>
+        </div>
+        {{else}}
         <!-- Step 2: Under review -->
         <div class="timeline-step">
           <div class="step-line"></div>
@@ -203,6 +256,7 @@
             <p class="text-white/25 text-xs mt-0.5">Anda akan mendapat konfirmasi via WhatsApp</p>
           </div>
         </div>
+        {{end}}
       </div>
     </div>
 

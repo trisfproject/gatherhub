@@ -80,6 +80,8 @@ type AdminParticipantsData struct {
 	ExportURL      string
 	TabAllURL      string
 	TabPendingURL  string
+	TabRegisteredURL string
+	TabWaitlistURL   string
 	TabVerifiedURL string
 	TabRejectedURL string
 	PagePrevURL    string
@@ -482,7 +484,9 @@ func (h *AdminHandler) ParticipantList(c *fiber.Ctx) error {
 		PageItems:      pageItems,
 		ExportURL:      buildExportURL(filter, search),
 		TabAllURL:      buildParticipantsURL(1, "", search),
-		TabPendingURL:  buildParticipantsURL(1, "PENDING", search),
+		TabPendingURL:  buildParticipantsURL(1, "REGISTERED", search),
+		TabRegisteredURL: buildParticipantsURL(1, "REGISTERED", search),
+		TabWaitlistURL:   buildParticipantsURL(1, "WAITLIST", search),
 		TabVerifiedURL: buildParticipantsURL(1, "VERIFIED", search),
 		TabRejectedURL: buildParticipantsURL(1, "REJECTED", search),
 		PagePrevURL:    buildParticipantsURL(prevPage, filter, search),
@@ -747,6 +751,12 @@ func (h *AdminHandler) ExportParticipants(c *fiber.Ctx) error {
 		}
 		return statusLabel
 	}})
+	cols = append(cols, colDef{"Registration Status", 20, func(p *models.Participant) interface{} {
+		if p.Status == models.StatusWaitlist {
+			return "Waitlist"
+		}
+		return "Registered"
+	}})
 	cols = append(cols, colDef{"Registration Date", 22, func(p *models.Participant) interface{} {
 		return p.CreatedAt.Format("02/01/2006 15:04")
 	}})
@@ -835,9 +845,9 @@ func (h *AdminHandler) EventCreatePage(c *fiber.Ctx) error {
 			AdminUser:  adminUser,
 			AdminRole:  adminRole,
 			ActiveMenu: "events",
-			Stats:     stats,
+			Stats:      stats,
 		},
-		Form:      map[string]string{},
+		Form:      map[string]string{"enable_waiting_list": "true"},
 	})
 }
 
@@ -888,6 +898,7 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 		"enable_carpool":           c.FormValue("enable_carpool"),
 		"enable_tshirt_size":       c.FormValue("enable_tshirt_size"),
 		"enable_transportation_coordination": c.FormValue("enable_transportation_coordination"),
+		"enable_waiting_list":      c.FormValue("enable_waiting_list"),
 	}
 
 	var errs []string
@@ -1026,6 +1037,7 @@ func (h *AdminHandler) EventCreateSubmit(c *fiber.Ctx) error {
 		EnableCarpool:          c.FormValue("enable_carpool") == "true",
 		EnableTShirtSize:       c.FormValue("enable_tshirt_size") == "true",
 		EnableTransportationCoordination: c.FormValue("enable_transportation_coordination") == "true",
+		EnableWaitingList:      c.FormValue("enable_waiting_list") == "true",
 	}
 
 	if err := h.eventService.Create(newEvent); err != nil {
@@ -1089,6 +1101,7 @@ func (h *AdminHandler) EventEditPage(c *fiber.Ctx) error {
 		"enable_carpool":           strconv.FormatBool(event.EnableCarpool),
 		"enable_tshirt_size":       strconv.FormatBool(event.EnableTShirtSize),
 		"enable_transportation_coordination": strconv.FormatBool(event.EnableTransportationCoordination),
+		"enable_waiting_list":      strconv.FormatBool(event.EnableWaitingList),
 	}
 	if !event.RegistrationOpen.IsZero() {
 		formValues["registration_open"] = event.RegistrationOpen.Format("2006-01-02T15:04")
@@ -1173,6 +1186,7 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 		"enable_carpool":           c.FormValue("enable_carpool"),
 		"enable_tshirt_size":       c.FormValue("enable_tshirt_size"),
 		"enable_transportation_coordination": c.FormValue("enable_transportation_coordination"),
+		"enable_waiting_list":      c.FormValue("enable_waiting_list"),
 	}
 
 	var errs []string
@@ -1310,6 +1324,7 @@ func (h *AdminHandler) EventEditSubmit(c *fiber.Ctx) error {
 	event.EnableCarpool = c.FormValue("enable_carpool") == "true"
 	event.EnableTShirtSize = c.FormValue("enable_tshirt_size") == "true"
 	event.EnableTransportationCoordination = c.FormValue("enable_transportation_coordination") == "true"
+	event.EnableWaitingList = c.FormValue("enable_waiting_list") == "true"
 
 	if err := h.eventService.Update(event); err != nil {
 		errs = append(errs, "Gagal memperbarui Acara: "+err.Error())
@@ -1493,7 +1508,7 @@ func buildStatusFragment(p *models.Participant) string {
 	badge := statusBadgeHTML(p.Status)
 	actions := ""
 	switch p.Status {
-	case models.StatusPending:
+	case models.StatusPending, models.StatusRegistered:
 		eventTitle := "acara ini"
 		if p.Event.Title != "" {
 			eventTitle = p.Event.Title
@@ -1509,6 +1524,13 @@ func buildStatusFragment(p *models.Participant) string {
   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
   Tolak
 </button>`, p.ID, p.FullName, eventTitle, p.ID, p.FullName, eventTitle)
+	case models.StatusWaitlist:
+		actions = fmt.Sprintf(`
+<button onclick="confirmAction('/admin/participants/%d/status', 'REGISTERED', 'Apakah Anda yakin ingin mempromosikan %s menjadi REGISTERED?', 'REGISTERED')"
+  class="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
+  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3-3m0 0l3 3m-3-3v8M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+  Promosikan ke Registered
+</button>`, p.ID, p.FullName)
 	case models.StatusVerified:
 		actions = fmt.Sprintf(`
 <a href="/admin/participants/%d/qr"
@@ -1575,15 +1597,23 @@ func statusBadgeHTML(status models.ParticipantStatus) string {
 	case models.StatusVerified:
 		return `<span class="inline-flex items-center gap-2 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 rounded-full px-4 py-1.5 text-sm font-bold">
 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-TERVERIFIKASI</span>`
+VERIFIED</span>`
 	case models.StatusRejected:
 		return `<span class="inline-flex items-center gap-2 bg-red-500/20 border border-red-500/40 text-red-300 rounded-full px-4 py-1.5 text-sm font-bold">
 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-DITOLAK</span>`
+REJECTED</span>`
+	case models.StatusWaitlist:
+		return `<span class="inline-flex items-center gap-2 bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 rounded-full px-4 py-1.5 text-sm font-bold">
+<span class="w-2 h-2 bg-cyan-400 rounded-full" style="animation:pulse 2s infinite"></span>
+WAITLIST</span>`
+	case models.StatusRegistered:
+		return `<span class="inline-flex items-center gap-2 bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 rounded-full px-4 py-1.5 text-sm font-bold">
+<span class="w-2 h-2 bg-indigo-400 rounded-full" style="animation:pulse 2s infinite"></span>
+REGISTERED</span>`
 	default:
 		return `<span class="inline-flex items-center gap-2 bg-amber-500/20 border border-amber-500/40 text-amber-300 rounded-full px-4 py-1.5 text-sm font-bold">
 <span class="w-2 h-2 bg-amber-400 rounded-full" style="animation:pulse 2s infinite"></span>
-MENUNGGU</span>`
+PENDING</span>`
 	}
 }
 
@@ -2147,6 +2177,10 @@ func buildAdminFuncMap() template.FuncMap {
 				return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
 			case models.StatusRejected:
 				return "bg-red-500/15 text-red-300 border-red-500/30"
+			case models.StatusWaitlist:
+				return "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
+			case models.StatusRegistered:
+				return "bg-indigo-500/15 text-indigo-300 border-indigo-500/30"
 			default:
 				return "bg-amber-500/15 text-amber-300 border-amber-500/30"
 			}
@@ -2154,11 +2188,15 @@ func buildAdminFuncMap() template.FuncMap {
 		"statusLabel": func(status models.ParticipantStatus) string {
 			switch status {
 			case models.StatusVerified:
-				return "Terverifikasi"
+				return "Verified"
 			case models.StatusRejected:
-				return "Ditolak"
+				return "Rejected"
+			case models.StatusWaitlist:
+				return "Waitlist"
+			case models.StatusRegistered:
+				return "Registered"
 			default:
-				return "Menunggu"
+				return "Pending"
 			}
 		},
 		"isPDF": func(filename string) bool {

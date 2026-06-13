@@ -92,7 +92,7 @@
                 {{$status := .Participant.Status | printf "%s"}}
                 {{$id := .Participant.ID}}
                 {{$name := .Participant.FullName}}
-                {{if isEq $status "PENDING"}}
+                {{if or (isEq $status "PENDING") (isEq $status "REGISTERED")}}
                 <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'VERIFIED', 'Apakah Anda yakin ingin memverifikasi pendaftaran {{$name}} untuk {{if $.Event}}{{$.Event.Title}}{{else}}acara ini{{end}}?', 'VERIFIED')"
                   class="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
@@ -102,6 +102,12 @@
                   class="flex-1 flex items-center justify-center gap-2 bg-red-700 hover:bg-red-600 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                   Tolak
+                </button>
+                {{else if isEq $status "WAITLIST"}}
+                <button onclick="confirmAction('/admin/participants/{{$id}}/status', 'REGISTERED', 'Apakah Anda yakin ingin mempromosikan {{$name}} menjadi REGISTERED?', 'REGISTERED')"
+                  class="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3-3m0 0l3 3m-3-3v8M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  Promosikan ke Registered
                 </button>
                 {{else if isEq $status "VERIFIED"}}
                 <a href="/admin/participants/{{$id}}/qr"

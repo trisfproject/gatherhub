@@ -36,9 +36,10 @@ type RegisterData struct {
 
 // SuccessData is the template data for the success page
 type SuccessData struct {
-	Participant *models.Participant
-	Event       *models.Event
-	WALink      string // formatted https://wa.me/{number} link
+	Participant      *models.Participant
+	Event            *models.Event
+	WALink           string // formatted https://wa.me/{number} link
+	WaitlistPosition int64
 }
 
 // ─────────────────────── Handler ───────────────────────
@@ -109,6 +110,18 @@ func (h *PageHandler) RegisterPage(c *fiber.Ctx) error {
 	if guardMsg := registrationGuard(event); guardMsg != "" {
 		return h.renderError(c, guardMsg, "/")
 	}
+
+	// Guard: check event capacity when waiting list is disabled
+	if event.MaxParticipants > 0 && !event.EnableWaitingList {
+		stats, err := h.participantService.GetFilteredStats(event.ID, "", "")
+		if err == nil {
+			activeCount := stats.Registered + stats.Verified + stats.CheckedIn + stats.Pending
+			if activeCount >= int64(event.MaxParticipants) {
+				return h.renderError(c, "Pendaftaran sudah penuh.", "/")
+			}
+		}
+	}
+
 	return h.render(c, "register.html", RegisterData{
 		Event: event,
 		Form:  map[string]string{},
@@ -139,6 +152,17 @@ func (h *PageHandler) RegisterSubmit(c *fiber.Ctx) error {
 	// Guard: reject submissions for non-PUBLISHED / closed-window events
 	if guardMsg := registrationGuard(event); guardMsg != "" {
 		return h.renderError(c, guardMsg, "/")
+	}
+
+	// Guard: check event capacity when waiting list is disabled
+	if event.MaxParticipants > 0 && !event.EnableWaitingList {
+		stats, err := h.participantService.GetFilteredStats(event.ID, "", "")
+		if err == nil {
+			activeCount := stats.Registered + stats.Verified + stats.CheckedIn + stats.Pending
+			if activeCount >= int64(event.MaxParticipants) {
+				return h.renderError(c, "Pendaftaran sudah penuh.", "/")
+			}
+		}
 	}
 
 	// Parse form fields
@@ -231,12 +255,18 @@ func (h *PageHandler) Success(c *fiber.Ctx) error {
 		return c.Redirect("/", fiber.StatusSeeOther)
 	}
 
+	var waitlistPos int64 = 0
+	if participant.Status == models.StatusWaitlist {
+		waitlistPos, _ = h.participantService.GetWaitlistPosition(event.ID, participant.ID)
+	}
+
 	waLink := "https://wa.me/" + event.AdminWhatsapp
 
 	return h.render(c, "success.html", SuccessData{
-		Participant: participant,
-		Event:       event,
-		WALink:      waLink,
+		Participant:      participant,
+		Event:            event,
+		WALink:           waLink,
+		WaitlistPosition: waitlistPos,
 	})
 }
 

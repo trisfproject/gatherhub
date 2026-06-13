@@ -59,6 +59,10 @@ func main() {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
+	// Update existing data for waiting list setting and status
+	db.Exec("UPDATE events SET enable_waiting_list = true WHERE enable_waiting_list IS NULL")
+	db.Exec("UPDATE participants SET status = 'REGISTERED' WHERE status = 'PENDING'")
+
 	// ── Load Settings Service ─────────────────────────────────
 	settingsService := services.NewSettingsService(db)
 	if err := settingsService.Load(); err != nil {

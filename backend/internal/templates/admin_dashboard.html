@@ -224,10 +224,10 @@
       <div class="lg:col-span-2 glass p-6">
         <p class="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-3">Acara Aktif</p>
         <h3 class="text-white font-bold text-lg leading-snug mb-4">{{.SelectedEvent.Title}}</h3>
-        <div class="grid grid-cols-2 gap-3 text-sm">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
           <div class="bg-white/4 rounded-xl p-3.5">
             <p class="text-white/35 text-xs mb-1">Tanggal</p>
-            <p class="text-white font-semibold">{{.SelectedEvent.EventDate | formatDateLong}}</p>
+            <p class="text-white font-semibold truncate">{{.SelectedEvent.EventDate | formatDateLong}}</p>
           </div>
           <div class="bg-white/4 rounded-xl p-3.5">
             <p class="text-white/35 text-xs mb-1">Lokasi</p>
@@ -235,11 +235,33 @@
           </div>
           <div class="bg-white/4 rounded-xl p-3.5">
             <p class="text-white/35 text-xs mb-1">Biaya</p>
-            <p class="text-emerald-300 font-bold">{{.SelectedEvent.Price | formatPrice}}</p>
+            <p class="text-emerald-300 font-bold truncate">{{.SelectedEvent.Price | formatPrice}}</p>
           </div>
           <div class="bg-white/4 rounded-xl p-3.5">
             <p class="text-white/35 text-xs mb-1">Admin Acara</p>
-            <p class="text-white font-semibold">{{.SelectedEvent.AdminName}}</p>
+            <p class="text-white font-semibold truncate">{{.SelectedEvent.AdminName}}</p>
+          </div>
+          <div class="bg-white/4 rounded-xl p-3.5 col-span-1">
+            <p class="text-white/35 text-xs mb-1">Kapasitas (Capacity)</p>
+            <p class="text-white font-bold">{{if gt .Stats.Capacity 0}}{{.Stats.Capacity}}{{else}}Tanpa Batas{{end}}</p>
+          </div>
+          <div class="bg-white/4 rounded-xl p-3.5 col-span-1">
+            <p class="text-white/35 text-xs mb-1">Terdaftar (Registered)</p>
+            <p class="text-white font-bold">{{.Stats.Registered}}</p>
+          </div>
+          <div class="bg-white/4 rounded-xl p-3.5 col-span-1">
+            <p class="text-white/35 text-xs mb-1">Waiting List</p>
+            <p class="text-white font-bold">{{.Stats.Waitlist}}</p>
+          </div>
+          <div class="bg-white/4 rounded-xl p-3.5 col-span-1">
+            <p class="text-white/35 text-xs mb-1">Sisa Kursi (Remaining)</p>
+            <p class="text-white font-bold">
+              {{if gt .Stats.Capacity 0}}
+                {{if lt .Stats.RemainingSeats 0}}0{{else}}{{.Stats.RemainingSeats}}{{end}}
+              {{else}}
+                —
+              {{end}}
+            </p>
           </div>
         </div>
       </div>
@@ -248,12 +270,12 @@
       <!-- Quick Actions -->
       <div class="{{if not .SelectedEvent}}lg:col-span-3{{end}} glass p-6 flex flex-col gap-3">
         <p class="text-xs font-bold uppercase tracking-widest text-white/40 mb-1">Aksi Cepat (Quick Actions)</p>
-        <a href="/admin/participants?status=PENDING"
+        <a href="/admin/participants?status=REGISTERED"
            class="flex items-center gap-3 bg-amber-500/10 border border-amber-500/25 hover:border-amber-500/50 text-amber-300 font-semibold px-4 py-3 rounded-xl text-sm transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
-          Pending Participants ({{.Stats.Pending}})
+          Pending Participants ({{.Stats.Registered}})
         </a>
         <a href="/admin/participants"
            class="flex items-center gap-3 bg-indigo-500/10 border border-indigo-500/25 hover:border-indigo-500/50 text-indigo-300 font-semibold px-4 py-3 rounded-xl text-sm transition-colors">

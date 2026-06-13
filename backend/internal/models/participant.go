@@ -9,6 +9,8 @@ type ParticipantStatus string
 
 const (
 	StatusPending   ParticipantStatus = "PENDING"
+	StatusRegistered ParticipantStatus = "REGISTERED"
+	StatusWaitlist   ParticipantStatus = "WAITLIST"
 	StatusVerified  ParticipantStatus = "VERIFIED"
 	StatusRejected  ParticipantStatus = "REJECTED"
 	StatusCheckedIn ParticipantStatus = "CHECKED_IN"
