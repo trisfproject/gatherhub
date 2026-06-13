@@ -218,64 +218,71 @@
       </div>
     </div>
 
-    <!-- ── Charts Row ── -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 fade-up">
-      <!-- Registrations by Day (Line Chart) -->
-      <div class="lg:col-span-2 glass p-6 flex flex-col">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-white text-base">Registrasi Per Hari</h3>
-          <span class="text-xs text-white/40">Tren pendaftaran peserta</span>
-        </div>
-        <div id="registrations-by-day-empty" class="hidden flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[300px]">
-          <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-3">
-            <svg class="w-6 h-6 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-            </svg>
+    <!-- ── Event Info + Quick Actions ── -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 fade-up">
+      {{if .SelectedEvent}}
+      <div class="lg:col-span-2 glass p-6">
+        <p class="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-3">Acara Aktif</p>
+        <h3 class="text-white font-bold text-lg leading-snug mb-4">{{.SelectedEvent.Title}}</h3>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div class="bg-white/4 rounded-xl p-3.5">
+            <p class="text-white/35 text-xs mb-1">Tanggal</p>
+            <p class="text-white font-semibold">{{.SelectedEvent.EventDate | formatDateLong}}</p>
           </div>
-          <p class="text-white/40 text-sm font-medium">Tidak ada data pendaftaran dalam periode ini</p>
-        </div>
-        <div id="registrations-by-day-container" class="relative flex-1 min-h-[300px]">
-          <canvas id="registrationsByDayChart"></canvas>
-        </div>
-      </div>
-
-      <!-- City Distribution (Bar Chart) -->
-      <div class="glass p-6 flex flex-col">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-white text-base">Peserta Per Kota</h3>
-          <span class="text-xs text-white/40">Top 10 Kota</span>
-        </div>
-        <div id="participants-by-city-empty" class="hidden flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[300px]">
-          <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-3">
-            <svg class="w-6 h-6 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
+          <div class="bg-white/4 rounded-xl p-3.5">
+            <p class="text-white/35 text-xs mb-1">Lokasi</p>
+            <p class="text-white font-semibold truncate">{{.SelectedEvent.Location}}</p>
           </div>
-          <p class="text-white/40 text-sm font-medium">Tidak ada data kota asal peserta</p>
-        </div>
-        <div id="participants-by-city-container" class="relative flex-1 min-h-[300px]">
-          <canvas id="participantsByCityChart"></canvas>
+          <div class="bg-white/4 rounded-xl p-3.5">
+            <p class="text-white/35 text-xs mb-1">Biaya</p>
+            <p class="text-emerald-300 font-bold">{{.SelectedEvent.Price | formatPrice}}</p>
+          </div>
+          <div class="bg-white/4 rounded-xl p-3.5">
+            <p class="text-white/35 text-xs mb-1">Admin Acara</p>
+            <p class="text-white font-semibold">{{.SelectedEvent.AdminName}}</p>
+          </div>
         </div>
       </div>
-    </div>
+      {{end}}
 
-    <!-- Estate Distribution (Bar Chart) -->
-    <div class="glass p-6 flex flex-col fade-up">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="font-bold text-white text-base">Peserta Per Kawasan Industri</h3>
-        <span class="text-xs text-white/40">Top 10 Kawasan Industri</span>
-      </div>
-      <div id="participants-by-estate-empty" class="hidden flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[250px]">
-        <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-3">
-          <svg class="w-6 h-6 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+      <!-- Quick Actions -->
+      <div class="{{if not .SelectedEvent}}lg:col-span-3{{end}} glass p-6 flex flex-col gap-3">
+        <p class="text-xs font-bold uppercase tracking-widest text-white/40 mb-1">Aksi Cepat (Quick Actions)</p>
+        <a href="/admin/participants?status=PENDING"
+           class="flex items-center gap-3 bg-amber-500/10 border border-amber-500/25 hover:border-amber-500/50 text-amber-300 font-semibold px-4 py-3 rounded-xl text-sm transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
-        </div>
-        <p class="text-white/40 text-sm font-medium">Tidak ada data kawasan industri</p>
-      </div>
-      <div id="participants-by-estate-container" class="relative flex-1 min-h-[250px]">
-        <canvas id="participantsByEstateChart"></canvas>
+          Pending Participants ({{.Stats.Pending}})
+        </a>
+        <a href="/admin/participants"
+           class="flex items-center gap-3 bg-indigo-500/10 border border-indigo-500/25 hover:border-indigo-500/50 text-indigo-300 font-semibold px-4 py-3 rounded-xl text-sm transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          All Participants
+        </a>
+        <a href="/admin/participants?status=VERIFIED"
+           class="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/25 hover:border-emerald-500/50 text-emerald-300 font-semibold px-4 py-3 rounded-xl text-sm transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Verified Participants ({{.Stats.Verified}})
+        </a>
+        <a href="/admin/broadcasts/create"
+           class="flex items-center gap-3 bg-purple-500/10 border border-purple-500/25 hover:border-purple-500/50 text-purple-300 font-semibold px-4 py-3 rounded-xl text-sm transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+          </svg>
+          Create Broadcast
+        </a>
+        <a href="/admin/transportation"
+           class="flex items-center gap-3 bg-pink-500/10 border border-pink-500/25 hover:border-pink-500/50 text-pink-300 font-semibold px-4 py-3 rounded-xl text-sm transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+          </svg>
+          Transportation Coordination
+        </a>
       </div>
     </div>
 
@@ -378,57 +385,64 @@
       </div>
     </div>
 
-    <!-- ── Event Info + Quick Actions ── -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-      {{if .SelectedEvent}}
-      <div class="lg:col-span-2 glass p-6">
-        <p class="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-3">Acara Aktif</p>
-        <h3 class="text-white font-bold text-lg leading-snug mb-4">{{.SelectedEvent.Title}}</h3>
-        <div class="grid grid-cols-2 gap-3 text-sm">
-          <div class="bg-white/4 rounded-xl p-3.5">
-            <p class="text-white/35 text-xs mb-1">Tanggal</p>
-            <p class="text-white font-semibold">{{.SelectedEvent.EventDate | formatDateLong}}</p>
+    <!-- ── Charts Row ── -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 fade-up">
+      <!-- Registrations by Day (Line Chart) -->
+      <div class="lg:col-span-2 glass p-6 flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-white text-base">Registrasi Per Hari</h3>
+          <span class="text-xs text-white/40">Tren pendaftaran peserta</span>
+        </div>
+        <div id="registrations-by-day-empty" class="hidden flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[300px]">
+          <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-3">
+            <svg class="w-6 h-6 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
           </div>
-          <div class="bg-white/4 rounded-xl p-3.5">
-            <p class="text-white/35 text-xs mb-1">Lokasi</p>
-            <p class="text-white font-semibold truncate">{{.SelectedEvent.Location}}</p>
-          </div>
-          <div class="bg-white/4 rounded-xl p-3.5">
-            <p class="text-white/35 text-xs mb-1">Biaya</p>
-            <p class="text-emerald-300 font-bold">{{.SelectedEvent.Price | formatPrice}}</p>
-          </div>
-          <div class="bg-white/4 rounded-xl p-3.5">
-            <p class="text-white/35 text-xs mb-1">Admin Acara</p>
-            <p class="text-white font-semibold">{{.SelectedEvent.AdminName}}</p>
-          </div>
+          <p class="text-white/40 text-sm font-medium">Tidak ada data pendaftaran dalam periode ini</p>
+        </div>
+        <div id="registrations-by-day-container" class="relative flex-1 min-h-[300px]">
+          <canvas id="registrationsByDayChart"></canvas>
         </div>
       </div>
-      {{end}}
 
-      <!-- Quick Actions -->
-      <div class="glass p-6 flex flex-col gap-3">
-        <p class="text-xs font-bold uppercase tracking-widest text-white/40 mb-1">Aksi Cepat</p>
-        <a href="/admin/participants?status=PENDING"
-           class="flex items-center gap-3 bg-amber-500/10 border border-amber-500/25 hover:border-amber-500/50 text-amber-300 font-semibold px-4 py-3 rounded-xl text-sm transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      <!-- City Distribution (Bar Chart) -->
+      <div class="glass p-6 flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-white text-base">Peserta Per Kota</h3>
+          <span class="text-xs text-white/40">Top 10 Kota</span>
+        </div>
+        <div id="participants-by-city-empty" class="hidden flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[300px]">
+          <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-3">
+            <svg class="w-6 h-6 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </div>
+          <p class="text-white/40 text-sm font-medium">Tidak ada data kota asal peserta</p>
+        </div>
+        <div id="participants-by-city-container" class="relative flex-1 min-h-[300px]">
+          <canvas id="participantsByCityChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Estate Distribution (Bar Chart) -->
+    <div class="glass p-6 flex flex-col fade-up">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-white text-base">Peserta Per Kawasan Industri</h3>
+        <span class="text-xs text-white/40">Top 10 Kawasan Industri</span>
+      </div>
+      <div id="participants-by-estate-empty" class="hidden flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[250px]">
+        <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-3">
+          <svg class="w-6 h-6 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
           </svg>
-          Lihat {{.Stats.Pending}} Menunggu
-        </a>
-        <a href="/admin/participants"
-           class="flex items-center gap-3 bg-indigo-500/10 border border-indigo-500/25 hover:border-indigo-500/50 text-indigo-300 font-semibold px-4 py-3 rounded-xl text-sm transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-          </svg>
-          Semua Peserta
-        </a>
-        <a href="/admin/participants?status=VERIFIED"
-           class="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/25 hover:border-emerald-500/50 text-emerald-300 font-semibold px-4 py-3 rounded-xl text-sm transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          Terverifikasi ({{.Stats.Verified}})
-        </a>
+        </div>
+        <p class="text-white/40 text-sm font-medium">Tidak ada data kawasan industri</p>
+      </div>
+      <div id="participants-by-estate-container" class="relative flex-1 min-h-[250px]">
+        <canvas id="participantsByEstateChart"></canvas>
       </div>
     </div>
 
