@@ -13,9 +13,11 @@ type NotificationLog struct {
 	Channel       string    `json:"channel" gorm:"not null;size:50"`    // WHATSAPP, EMAIL, TELEGRAM, WEBHOOK
 	Message       string    `json:"message" gorm:"type:text;not null"`
 	Status        string    `json:"status" gorm:"not null;size:50"` // SUCCESS, FAILED
+	BroadcastID   *uint      `json:"broadcast_id,omitempty" gorm:"index"`
 	CreatedAt     time.Time `json:"created_at"`
 
 	// Associations
 	Participant Participant `json:"participant,omitempty" gorm:"foreignKey:ParticipantID;constraint:OnDelete:CASCADE"`
 	Event       Event       `json:"event,omitempty" gorm:"foreignKey:EventID;constraint:OnDelete:CASCADE"`
+	Broadcast   *Broadcast  `json:"broadcast,omitempty" gorm:"foreignKey:BroadcastID;constraint:OnDelete:SET NULL"`
 }

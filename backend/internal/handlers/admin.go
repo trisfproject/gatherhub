@@ -203,6 +203,7 @@ type AdminHandler struct {
 	checkinService      *services.CheckinService
 	settingsService     *services.SettingsService
 	backupService       *services.BackupService
+	broadcastService    *services.BroadcastService
 	tmpl                *template.Template
 }
 
@@ -218,6 +219,7 @@ func NewAdminHandler(
 	checkinService *services.CheckinService,
 	settingsService *services.SettingsService,
 	backupService *services.BackupService,
+	broadcastService *services.BroadcastService,
 ) (*AdminHandler, error) {
 	funcMap := buildAdminFuncMap()
 	funcMap["setting"] = func(key string) string {
@@ -247,6 +249,9 @@ func NewAdminHandler(
 		"admin_backups.html",
 		"admin_checkin.html",
 		"admin_attendance.html",
+		"admin_broadcasts.html",
+		"admin_broadcast_create.html",
+		"admin_broadcast_detail.html",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse admin templates: %w", err)
@@ -262,6 +267,7 @@ func NewAdminHandler(
 		checkinService:      checkinService,
 		settingsService:     settingsService,
 		backupService:       backupService,
+		broadcastService:    broadcastService,
 		tmpl:                t,
 	}, nil
 }
@@ -2367,4 +2373,205 @@ func (h *AdminHandler) AttendanceDashboard(c *fiber.Ctx) error {
 
 	return h.render(c, "admin_attendance.html", data)
 }
+
+// BroadcastList handles GET /admin/broadcasts
+func (h *AdminHandler) BroadcastList(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	broadcasts, err := h.broadcastService.GetAllBroadcasts()
+	if err != nil {
+		broadcasts = []models.Broadcast{}
+	}
+
+	data := fiber.Map{
+		"AdminUser":  adminUser,
+		"AdminRole":  adminRole,
+		"Broadcasts": broadcasts,
+	}
+	return h.render(c, "admin_broadcasts.html", data)
+}
+
+// BroadcastCreatePage handles GET /admin/broadcasts/create
+func (h *AdminHandler) BroadcastCreatePage(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	events, err := h.eventService.GetAll()
+	if err != nil {
+		events = []models.Event{}
+	}
+
+	data := fiber.Map{
+		"AdminUser": adminUser,
+		"AdminRole": adminRole,
+		"Events":    events,
+	}
+	return h.render(c, "admin_broadcast_create.html", data)
+}
+
+// BroadcastCountRecipients handles GET /admin/broadcasts/count-recipients
+func (h *AdminHandler) BroadcastCountRecipients(c *fiber.Ctx) error {
+	var eventID uint
+	if idStr := c.Query("event_id"); idStr != "" {
+		if val, err := strconv.Atoi(idStr); err == nil {
+			eventID = uint(val)
+		}
+	}
+	group := c.Query("group")
+	city := c.Query("city")
+	estate := c.Query("industrial_estate")
+	company := c.Query("company_name")
+
+	count, err := h.broadcastService.GetRecipientsCount(eventID, group, city, estate, company)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Error")
+	}
+
+	htmlBadge := fmt.Sprintf(`<span class="bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-lg border border-indigo-500/30 font-bold" id="recipients-badge">Estimasi: %d Peserta</span>`, count)
+	return c.Type("html").SendString(htmlBadge)
+}
+
+// BroadcastPreview handles POST /admin/broadcasts/preview
+func (h *AdminHandler) BroadcastPreview(c *fiber.Ctx) error {
+	var eventID uint
+	if idStr := c.FormValue("event_id"); idStr != "" {
+		if val, err := strconv.Atoi(idStr); err == nil {
+			eventID = uint(val)
+		}
+	}
+	group := c.FormValue("group")
+	city := c.FormValue("city")
+	estate := c.FormValue("industrial_estate")
+	company := c.FormValue("company_name")
+	title := c.FormValue("title")
+	body := c.FormValue("message")
+
+	participants, err := h.broadcastService.GetRecipients(eventID, group, city, estate, company)
+	var samplePart models.Participant
+	hasMatches := false
+
+	if err == nil && len(participants) > 0 {
+		samplePart = participants[0]
+		hasMatches = true
+	} else {
+		// Fallback dummy participant for preview purposes
+		var dummyEvent models.Event
+		if eventID > 0 {
+			if e, err := h.eventService.GetByID(eventID); err == nil {
+				dummyEvent = *e
+			}
+		}
+		if dummyEvent.ID == 0 {
+			dummyEvent = models.Event{Title: "Seminar & Gathering Nasional"}
+		}
+		samplePart = models.Participant{
+			FullName:           "Budi Santoso",
+			RegistrationNumber: "GH-2026-9999",
+			Event:              dummyEvent,
+		}
+	}
+
+	renderedTitle := title
+	if renderedTitle == "" {
+		renderedTitle = "(Judul Kosong)"
+	}
+	renderedBody := h.broadcastService.RenderTemplate(body, &samplePart)
+	if renderedBody == "" {
+		renderedBody = "(Pesan Kosong)"
+	}
+
+	data := fiber.Map{
+		"HasMatches":   hasMatches,
+		"TotalMatches": len(participants),
+		"PreviewTitle": renderedTitle,
+		"PreviewBody":  renderedBody,
+		"SampleName":   samplePart.FullName,
+		"SampleRegNum": samplePart.RegistrationNumber,
+		"SampleEvent":  samplePart.Event.Title,
+	}
+
+	return h.render(c, "broadcast_preview_fragment", data)
+}
+
+// BroadcastCreateSubmit handles POST /admin/broadcasts/create
+func (h *AdminHandler) BroadcastCreateSubmit(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+
+	var eventID uint
+	if idStr := c.FormValue("event_id"); idStr != "" {
+		if val, err := strconv.Atoi(idStr); err == nil {
+			eventID = uint(val)
+		}
+	}
+	if eventID == 0 {
+		setFlash(c, "error", "Pilih acara terlebih dahulu.")
+		return c.Redirect("/admin/broadcasts/create")
+	}
+
+	title := strings.TrimSpace(c.FormValue("title"))
+	message := strings.TrimSpace(c.FormValue("message"))
+	group := c.FormValue("group")
+	city := strings.TrimSpace(c.FormValue("city"))
+	estate := strings.TrimSpace(c.FormValue("industrial_estate"))
+	company := strings.TrimSpace(c.FormValue("company_name"))
+
+	if title == "" || message == "" {
+		setFlash(c, "error", "Judul dan Isi Pesan harus diisi.")
+		return c.Redirect("/admin/broadcasts/create")
+	}
+
+	broadcast, err := h.broadcastService.CreateBroadcast(eventID, title, message, group, city, estate, company)
+	if err != nil {
+		setFlash(c, "error", fmt.Sprintf("Gagal mengirim broadcast: %v", err))
+		return c.Redirect("/admin/broadcasts/create")
+	}
+
+	// Write audit log entry
+	oldVal := map[string]interface{}{}
+	newVal := map[string]interface{}{
+		"broadcast_id":     broadcast.ID,
+		"title":            broadcast.Title,
+		"event_id":         eventID,
+		"audience":         broadcast.Audience,
+		"total_recipients": broadcast.TotalRecipients,
+	}
+	_ = h.auditLogService.Log(adminUser, "CREATE", "BROADCAST", broadcast.ID, oldVal, newVal, c.IP(), c.Get("User-Agent"))
+
+	setFlash(c, "success", fmt.Sprintf("Broadcast '%s' berhasil dikirim ke %d peserta.", broadcast.Title, broadcast.TotalRecipients))
+	return c.Redirect("/admin/broadcasts")
+}
+
+// BroadcastDetail handles GET /admin/broadcasts/:id
+func (h *AdminHandler) BroadcastDetail(c *fiber.Ctx) error {
+	adminUser, _ := c.Locals("admin_username").(string)
+	adminRole, _ := c.Locals("admin_role").(string)
+
+	idStr := c.Params("id")
+	val, err := strconv.Atoi(idStr)
+	if err != nil || val <= 0 {
+		setFlash(c, "error", "ID Broadcast tidak valid.")
+		return c.Redirect("/admin/broadcasts")
+	}
+
+	broadcast, err := h.broadcastService.GetBroadcastByID(uint(val))
+	if err != nil {
+		setFlash(c, "error", "Broadcast tidak ditemukan.")
+		return c.Redirect("/admin/broadcasts")
+	}
+
+	logs, err := h.broadcastService.GetBroadcastLogs(broadcast.ID)
+	if err != nil {
+		logs = []models.NotificationLog{}
+	}
+
+	data := fiber.Map{
+		"AdminUser": adminUser,
+		"AdminRole": adminRole,
+		"Broadcast": broadcast,
+		"Logs":      logs,
+	}
+	return h.render(c, "admin_broadcast_detail.html", data)
+}
+
 
